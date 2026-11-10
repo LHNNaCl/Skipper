@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Skipper UI 视觉稿</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --win: #14171b;
+    --panel: #1a1e23;
+    --panel2: #20242a;
+    --line: #2b3138;
+    --line2: #343b44;
+    --text: #e8eaec;
+    --muted: #98a0a9;
+    --dim: #6b727b;
+    --accent: #4f8cff;
+    --accent2: #74a5ff;
+    --ok: #45c97a;
+    --warn: #e0b34f;
+    --danger: #e5645f;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg);
+    font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 26px 0 40px; gap: 30px;
+  }
+
+  /* ============ 窗口外框 ============ */
+  .window {
+    width: 1024px;
+    background: var(--win);
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02) inset;
+    overflow: hidden;
+  }
+  .titlebar {
+    height: 40px;
+    display: flex; align-items: center;
+    padding: 0 0 0 14px;
+    background: #101318;
+    border-bottom: 1px solid var(--line);
+    user-select: none;
+  }
+  .titlebar .app-icon {
+    width: 18px; height: 18px; border-radius: 5px;
+    background: linear-gradient(135deg, #4f8cff, #7ab0ff);
+    display: grid; place-items: center;
+    font-size: 11px; color: #fff; margin-right: 9px;
+  }
+  .titlebar .name { font-size: 12.5px; color: #c9ced4; }
+  .titlebar .name b { color: #eef0f2; font-weight: 600; }
+  .titlebar .spacer { flex: 1; }
+  .winbtns { display: flex; height: 40px; }
+  .winbtns span {
+    width: 46px; display: grid; place-items: center;
+    color: #8a919a; font-size: 12px;
+  }
+  .winbtns span.close { color: #c8cdd2; }
+  .winbtns span.close:hover { background: #c42b1c; color: #fff; }
+
+  .body { padding: 18px 20px 20px; }
+
+  /* ============ 步骤条 ============ */
+  .steps { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .step { display: flex; align-items: center; gap: 8px; }
+  .step .n {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 600;
+    background: var(--panel2); color: var(--muted);
+    border: 1px solid var(--line2);
+  }
+  .step .t { color: var(--muted); font-size: 12.5px; }
+  .step.on .n { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step.on .t { color: var(--text); font-weight: 600; }
+  .step.done .n { background: rgba(69,201,122,.15); border-color: rgba(69,201,122,.4); color: var(--ok); }
+  .step.done .t { color: var(--muted); }
+  .step .line { width: 34px; height: 1px; background: var(--line2); }
+
+  /* ============ 面板 ============ */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .panel:last-child { margin-bottom: 0; }
+  .label { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .between { justify-content: space-between; }
+  .grow { flex: 1; min-width: 0; }
+
+  /* ============ 控件 ============ */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--line2);
+    background: var(--panel2);
+    color: var(--text);
+    font-size: 12.5px;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .btn.primary {
+    background: linear-gradient(180deg, #5a94ff, #3f7ef2);
+    border-color: #3f7ef2;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(63,126,242,.35);
+  }
+  .btn.ghost { background: transparent; color: var(--muted); }
+  .field {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 7px 11px;
+    color: var(--text);
+    font-size: 12.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .field.time {
+    width: 96px; text-align: center;
+    font-variant-numeric: tabular-nums;
+    color: #dfe3e7;
+  }
+  .field.time.empty { color: #565d66; }
+  .field.path { color: #c9ced4; }
+
+  /* ============ 表格 ============ */
+  .tbl { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tbl table { width: 100%; border-collapse: collapse; }
+  .tbl th {
+    text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted);
+    background: #161a1f; padding: 8px 12px; border-bottom: 1px solid var(--line);
+  }
+  .tbl td { padding: 8px 12px; border-bottom: 1px solid #23282e; vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl tr.hl td { background: rgba(79,140,255,.06); }
+  .tbl tr.excluded td { opacity: .45; }
+
+  .file { display: flex; align-items: center; gap: 10px; }
+  .file .icon {
+    width: 26px; height: 26px; border-radius: 6px; flex: none;
+    background: #23272d; border: 1px solid var(--line);
+    display: grid; place-items: center; font-size: 11px; color: #c8cdd2;
+  }
+  .file .meta { display: flex; flex-direction: column; min-width: 0; }
+  .file .meta b { font-weight: 600; font-size: 12.5px; }
+  .file .meta span { color: var(--dim); font-size: 11px; }
+  .time { font-variant-numeric: tabular-nums; color: #c9ced4; font-size: 12.5px; }
+
+  /* ============ 勾选 / 单选 ============ */
+  .radio {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1.5px solid #4a525c; margin: 0 auto;
+    position: relative;
+  }
+  .radio.on { border-color: var(--accent); }
+  .radio.on::after {
+    content: ""; position: absolute; inset: 3px;
+    border-radius: 50%; background: var(--accent);
+  }
+  .cbx {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1.5px solid #4a525c; margin: 0 auto;
+    display: grid; place-items: center;
+    color: transparent; font-size: 11px;
+  }
+  .cbx.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ============ 标签 ============ */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px;
+    background: #23272d; border: 1px solid var(--line);
+    font-size: 11.5px; color: #d3d7db; white-space: nowrap;
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: #6b727b; }
+  .chip.std { background: rgba(79,140,255,.12); border-color: rgba(79,140,255,.4); color: #a9c6ff; }
+  .chip.std .dot { background: var(--accent); }
+  .chip.chap { background: rgba(106,208,255,.10); border-color: rgba(106,208,255,.35); color: #9fdcff; }
+  .chip.chap .dot { background: #6ad0ff; }
+  .chip.audio { background: rgba(143,123,255,.10); border-color: rgba(143,123,255,.35); color: #bfb1ff; }
+  .chip.audio .dot { background: #8f7bff; }
+  .chip.black { background: rgba(154,161,168,.10); border-color: rgba(154,161,168,.35); color: #c3c8ce; }
+  .chip.black .dot { background: #9aa1a8; }
+  .chip.both { background: rgba(143,123,255,.08); border-color: rgba(143,123,255,.3); color: #c3bcdd; }
+  .chip.both .dot { background: linear-gradient(90deg, #9aa1a8, #8f7bff); }
+  .chip.manual { background: rgba(224,179,79,.10); border-color: rgba(224,179,79,.35); color: #ecd29a; }
+  .chip.manual .dot { background: var(--warn); }
+  .chip.none { color: #7d848d; }
+  .chip.none .dot { background: #565d66; }
+  .chip.ok { background: rgba(69,201,122,.10); border-color: rgba(69,201,122,.35); color: #8fe0b2; }
+  .chip.ok .dot { background: var(--ok); }
+  .chip.warn { background: rgba(224,179,79,.10); border-color: rgba(224,179,79,.35); color: #ecd29a; }
+  .chip.warn .dot { background: var(--warn); }
+  .chip.danger { background: rgba(229,100,95,.10); border-color: rgba(229,100,95,.35); color: #f0a19d; }
+  .chip.danger .dot { background: var(--danger); }
+  .chip.muted { color: #9aa1a8; }
+
+  /* ============ 提示条 ============ */
+  .banner {
+    display: flex; align-items: center; gap: 9px;
+    border: 1px solid rgba(224,179,79,.35);
+    background: rgba(224,179,79,.08);
+    color: #ecd29a;
+    padding: 9px 12px; border-radius: 8px;
+    font-size: 12.5px; margin-bottom: 12px;
+  }
+  .banner .i {
+    width: 17px; height: 17px; border-radius: 50%; flex: none;
+    border: 1.5px solid var(--warn); color: var(--warn);
+    display: grid; place-items: center; font-size: 10px; font-weight: 700;
+  }
+
+  /* ============ 进度 ============ */
+  .pbar {
+    height: 8px; border-radius: 999px;
+    background: #1b1f24; border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .pbar > div {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #3d74e6, #74a5ff);
+  }
+  .pbar.done > div { background: linear-gradient(90deg, #2f9e5f, #45c97a); }
+
+  .note { color: var(--dim); font-size: 11.5px; margin-top: 8px; }
+  .footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+  .footer .hint { color: var(--dim); font-size: 11.5px; }
+  .footer .btns { display: flex; gap: 8px; }
+  .kpis { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+  .kpis b { font-weight: 600; }
+
+  .std-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .times { display: flex; gap: 18px; }
+  .times .item .label { margin-bottom: 5px; }
+
+  .caption { width: 1024px; color: var(--dim); font-size: 12px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<script>
+  const page = new URLSearchParams(location.search).get("page") || "select";
+  const all = new URLSearchParams(location.search).get("all") === "1";
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("[data-screen]").forEach(el => {
+      el.style.display = (all || el.dataset.screen === page) ? "" : "none";
+    });
+  });
+</script>
+
+<!-- ================= 第一屏：选择目录 ================= -->
+<div class="caption" data-screen="select"><span>1 / 3　选择目录</span><span>Skipper 视觉稿</span></div>
+<div class="window" data-screen="select">
+  <div class="titlebar">
+    <div class="app-icon">▶</div>
+    <div class="name"><b>Skipper</b>　—　删除片头片尾</div>
+    <div class="spacer"></div>
+    <div class="winbtns"><span>—</span><span>▢</span><span class="close">✕</span></div>
+  </div>
+  <div class="body">
+
+    <div class="steps">
+      <div class="step on"><div class="n">1</div><div class="t">选择目录</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step"><div class="n">2</div><div class="t">确认时间</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step"><div class="n">3</div><div class="t">导出结果</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="label">目录</div>
+      <div class="row">
+        <div class="btn">选择目录…</div>
+        <div class="field path grow">D:\Media\番剧\某作品 第 1 季</div>
+        <div class="chip muted">mp4 · 6 个</div>
+        <div class="chip muted">mkv · 2 个</div>
+        <div class="chip">共 8 个</div>
+      </div>
+      <div class="note">只读取该目录第一层，不进入子目录。</div>
+    </div>
+
+    <div class="panel">
+      <div class="row between" style="margin-bottom:10px;">
+        <div class="label" style="margin:0;">视频列表（可选其中一集作为标准）</div>
+        <div style="color:var(--dim);font-size:11.5px;">标准视频需填写它的片头 / 片尾时间</div>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th style="width:52px;text-align:center;">标准</th><th>文件</th><th style="width:96px;">时长</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="radio"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第01话 启程.mp4</b><span>D:\Media\番剧\某作品 第 1 季</span></div></div></td>
+              <td class="time">23:42</td>
+            </tr>
+            <tr class="hl">
+              <td><div class="radio on"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第02话 重逢.mp4</b><span>D:\Media\番剧\某作品 第 1 季</span></div></div></td>
+              <td class="time">23:40</td>
+            </tr>
+            <tr>
+              <td><div class="radio"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第03话 暗流.mkv</b><span>D:\Media\番剧\某作品 第 1 季</span></div></div></td>
+              <td class="time">23:41</td>
+            </tr>
+            <tr>
+              <td><div class="radio"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第04话 转机.mp4</b><span>D:\Media\番剧\某作品 第 1 季</span></div></div></td>
+              <td class="time">23:43</td>
+            </tr>
+            <tr>
+              <td><div class="radio"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第05话 对决.mp4</b><span>D:\Media\番剧\某作品 第 1 季</span></div></div></td>
+              <td class="time">23:40</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">共 8 集，此处显示前 5 集。</div>
+    </div>
+
+    <div class="panel">
+      <div class="std-head">
+        <div class="chip std"><span class="dot"></span>标准视频：第02话 重逢.mp4</div>
+        <div style="color:var(--dim);font-size:11.5px;">其余视频用这段声音来对齐；时间可留空，空表示不剪这一头</div>
+      </div>
+      <div class="times">
+        <div class="item"><div class="label">片头起点</div><div class="field time">00:00:15</div></div>
+        <div class="item"><div class="label">片头终点</div><div class="field time">00:01:45</div></div>
+        <div class="item"><div class="label">片尾起点</div><div class="field time">00:21:55</div></div>
+        <div class="item"><div class="label">片尾终点</div><div class="field time">00:23:10</div></div>
+      </div>
+      <div class="footer">
+        <div class="hint">只填一个时间或时间超出时长时，不能开始分析</div>
+        <div class="btns">
+          <div class="btn ghost">清空标准</div>
+          <div class="btn primary">开始分析</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= 第二屏：确认时间 ================= -->
+<div class="caption" data-screen="confirm"><span>2 / 3　确认时间</span><span>Skipper 视觉稿</span></div>
+<div class="window" data-screen="confirm">
+  <div class="titlebar">
+    <div class="app-icon">▶</div>
+    <div class="name"><b>Skipper</b>　—　删除片头片尾</div>
+    <div class="spacer"></div>
+    <div class="winbtns"><span>—</span><span>▢</span><span class="close">✕</span></div>
+  </div>
+  <div class="body">
+
+    <div class="steps">
+      <div class="step done"><div class="n">✓</div><div class="t">选择目录</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step on"><div class="n">2</div><div class="t">确认时间</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step"><div class="n">3</div><div class="t">导出结果</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="banner"><span class="i">!</span>第05话 对决.mp4 未能按标准对齐，已改用章节和黑帧</div>
+
+      <div class="row between" style="margin-bottom:10px;">
+        <div class="label" style="margin:0;">分析结果（可修改后导出）</div>
+        <div style="color:var(--dim);font-size:11.5px;">修改过的来源会显示为「手动」</div>
+      </div>
+
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:52px;text-align:center;">排除</th>
+              <th>文件</th>
+              <th style="width:76px;">时长</th>
+              <th style="width:100px;text-align:center;">片头起点</th>
+              <th style="width:100px;text-align:center;">片头终点</th>
+              <th style="width:100px;text-align:center;">片尾起点</th>
+              <th style="width:100px;text-align:center;">片尾终点</th>
+              <th style="width:118px;">来源</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第01话 启程.mp4</b></div></div></td>
+              <td class="time">23:42</td>
+              <td><div class="field time">00:00:15</div></td>
+              <td><div class="field time">00:01:45</div></td>
+              <td><div class="field time">00:21:55</div></td>
+              <td><div class="field time">00:23:10</div></td>
+              <td><span class="chip std"><span class="dot"></span>标准</span></td>
+            </tr>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第02话 重逢.mp4</b></div></div></td>
+              <td class="time">23:40</td>
+              <td><div class="field time">00:00:15</div></td>
+              <td><div class="field time">00:01:45</div></td>
+              <td><div class="field time">00:21:55</div></td>
+              <td><div class="field time">00:23:10</div></td>
+              <td><span class="chip std"><span class="dot"></span>标准</span></td>
+            </tr>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第03话 暗流.mkv</b></div></div></td>
+              <td class="time">23:41</td>
+              <td><div class="field time">00:00:16</div></td>
+              <td><div class="field time">00:01:46</div></td>
+              <td><div class="field time">00:21:56</div></td>
+              <td><div class="field time">00:23:11</div></td>
+              <td><span class="chip manual"><span class="dot"></span>手动</span></td>
+            </tr>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第04话 转机.mp4</b></div></div></td>
+              <td class="time">23:43</td>
+              <td><div class="field time">00:00:15</div></td>
+              <td><div class="field time">00:01:45</div></td>
+              <td><div class="field time">00:21:54</div></td>
+              <td><div class="field time">00:23:09</div></td>
+              <td><span class="chip both"><span class="dot"></span>黑帧+音频</span></td>
+            </tr>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第05话 对决.mp4</b></div></div></td>
+              <td class="time">23:40</td>
+              <td><div class="field time">00:00:12</div></td>
+              <td><div class="field time">00:01:42</div></td>
+              <td><div class="field time">00:21:50</div></td>
+              <td><div class="field time">00:23:06</div></td>
+              <td><span class="chip chap"><span class="dot"></span>章节</span></td>
+            </tr>
+            <tr class="excluded">
+              <td><div class="cbx on">✓</div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第06话 回忆.mkv</b></div></div></td>
+              <td class="time">23:42</td>
+              <td><div class="field time">00:00:15</div></td>
+              <td><div class="field time">00:01:45</div></td>
+              <td><div class="field time">00:21:57</div></td>
+              <td><div class="field time">00:23:12</div></td>
+              <td><span class="chip std"><span class="dot"></span>标准</span></td>
+            </tr>
+            <tr>
+              <td><div class="cbx"></div></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第07话 真相.mp4</b></div></div></td>
+              <td class="time">23:44</td>
+              <td><div class="field time empty">未检出</div></td>
+              <td><div class="field time empty">未检出</div></td>
+              <td><div class="field time empty">未检出</div></td>
+              <td><div class="field time empty">未检出</div></td>
+              <td><span class="chip none"><span class="dot"></span>未检出</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">两头都空的集不会被导出。时间可改可清空，格式为 时:分:秒 或秒数。</div>
+
+      <div class="footer">
+        <div class="hint">确认后导出到　D:\Media\番剧\某作品 第 1 季\output\</div>
+        <div class="btns">
+          <div class="btn">返回选择</div>
+          <div class="btn primary">开始导出</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= 第三屏：导出结果 ================= -->
+<div class="caption" data-screen="progress"><span>3 / 3　导出结果</span><span>Skipper 视觉稿</span></div>
+<div class="window" data-screen="progress">
+  <div class="titlebar">
+    <div class="app-icon">▶</div>
+    <div class="name"><b>Skipper</b>　—　删除片头片尾</div>
+    <div class="spacer"></div>
+    <div class="winbtns"><span>—</span><span>▢</span><span class="close">✕</span></div>
+  </div>
+  <div class="body">
+
+    <div class="steps">
+      <div class="step done"><div class="n">✓</div><div class="t">选择目录</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step done"><div class="n">✓</div><div class="t">确认时间</div></div>
+      <div class="step"><div class="line"></div></div>
+      <div class="step on"><div class="n">3</div><div class="t">导出结果</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="row between" style="margin-bottom:10px;">
+        <div class="label" style="margin:0;">导出进度</div>
+        <div class="chip ok"><span class="dot"></span>全部完成</div>
+      </div>
+      <div class="pbar done"><div style="width:100%"></div></div>
+      <div class="row between" style="margin-top:8px;">
+        <div style="color:var(--muted);font-size:12px;">导出 8/8　第08话 新生.mp4</div>
+        <div style="color:var(--dim);font-size:11.5px;">输出目录　D:\Media\番剧\某作品 第 1 季\output\</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tbl">
+        <table>
+          <thead>
+            <tr><th style="width:110px;">状态</th><th>文件</th><th style="width:230px;">说明</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="chip ok"><span class="dot"></span>已导出</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第01话 启程.mp4</b><span>output\第01话 启程_trimmed.mp4</span></div></div></td>
+              <td class="time"></td>
+            </tr>
+            <tr>
+              <td><span class="chip ok"><span class="dot"></span>已导出</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第02话 重逢.mp4</b><span>output\第02话 重逢_trimmed.mp4</span></div></div></td>
+              <td class="time"></td>
+            </tr>
+            <tr>
+              <td><span class="chip ok"><span class="dot"></span>已导出</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第03话 暗流.mkv</b><span>output\第03话 暗流_trimmed.mkv</span></div></div></td>
+              <td class="time"></td>
+            </tr>
+            <tr>
+              <td><span class="chip muted"><span class="dot"></span>已排除</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第06话 回忆.mkv</b><span>未处理</span></div></div></td>
+              <td style="color:var(--muted);font-size:12px;">已排除</td>
+            </tr>
+            <tr>
+              <td><span class="chip warn"><span class="dot"></span>已跳过</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第07话 真相.mp4</b><span>未处理</span></div></div></td>
+              <td style="color:var(--muted);font-size:12px;">没有可剪的片头或片尾</td>
+            </tr>
+            <tr>
+              <td><span class="chip warn"><span class="dot"></span>已跳过</span></td>
+              <td><div class="file"><div class="icon">▶</div><div class="meta"><b>第08话 新生.mp4</b><span>未处理</span></div></div></td>
+              <td style="color:var(--muted);font-size:12px;">输出文件已存在</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="footer">
+        <div class="kpis">
+          <span>已导出 <b style="color:var(--ok);">5</b></span>
+          <span>已排除 <b>1</b></span>
+          <span>已跳过 <b style="color:var(--warn);">2</b></span>
+          <span>失败 <b style="color:var(--danger);">0</b></span>
+        </div>
+        <div class="btns">
+          <div class="btn primary">完成</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

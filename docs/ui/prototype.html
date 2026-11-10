@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skipper UI 原型</title>
+<style>
+  :root {
+    --bg: #0f1113;
+    --panel: #17191c;
+    --panel2: #1c1f23;
+    --line: #2a2e33;
+    --text: #e7e9ea;
+    --muted: #9aa1a8;
+    --accent: #4f8cff;
+    --accent2: #6aa0ff;
+    --danger: #ff6b6b;
+    --ok: #43d17a;
+    --warn: #e7b84c;
+    --chip: #24282d;
+    --shadow: 0 10px 24px rgba(0,0,0,.35);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, #0d0f11, #0a0b0c 60%);
+    color: var(--text);
+    font: 14px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  .app {
+    max-width: 1080px;
+    margin: 28px auto;
+    padding: 0 20px 28px;
+  }
+  .titlebar {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .titlebar h1 {
+    font-size: 20px; margin: 0; font-weight: 700; letter-spacing: .5px;
+  }
+  .titlebar .sub { color: var(--muted); font-size: 13px; }
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 14px;
+  }
+  .tab {
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); cursor: default; user-select: none;
+  }
+  .tab.active { color: var(--text); border-color: var(--accent); background: rgba(79,140,255,.12); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px;
+  }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .row > * { min-width: 0; }
+  .grow { flex: 1; }
+  .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--text); outline: none;
+  }
+  input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+  input::placeholder { color: #70757b; }
+  input.invalid { border-color: var(--danger); background: rgba(255,107,107,.06); }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    padding: 9px 14px; border-radius: 9px; cursor: pointer; user-select: none;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .btn:hover { border-color: #3a4046; background: #22262b; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent2); border-color: var(--accent2); }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .grid { display: grid; gap: 12px; }
+  .cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .table-wrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; background: #15171a; }
+  tr:last-child td { border-bottom: 0; }
+  .file { display: flex; align-items: center; gap: 10px; }
+  .file .icon {
+    width: 26px; height: 26px; border-radius: 7px; background: #23262b; border: 1px solid var(--line);
+    display: grid; place-items: center; color: #c8cdd2; font-size: 13px;
+  }
+  .file .meta { display: flex; flex-direction: column; }
+  .file .meta b { font-weight: 600; }
+  .file .meta span { color: var(--muted); font-size: 12px; }
+  .check {
+    width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); background: #191c20;
+    display: grid; place-items: center; color: transparent; cursor: pointer;
+  }
+  .check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .time { font-variant-numeric: tabular-nums; color: #dfe3e6; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px;
+    background: var(--chip); border: 1px solid var(--line); font-size: 12px; color: #d7dadd;
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 999px; background: #6b7076; }
+  .chip.std .dot { background: var(--accent); }
+  .chip.chap .dot { background: #6ad0ff; }
+  .chip.audio .dot { background: #8f7bff; }
+  .chip.black .dot { background: #9aa1a8; }
+  .chip.both .dot { background: linear-gradient(90deg, #9aa1a8, #8f7bff); }
+  .chip.manual .dot { background: var(--warn); }
+  .chip.none .dot { background: #5a6066; }
+  .banner {
+    border: 1px solid rgba(231,184,76,.35); background: rgba(231,184,76,.10);
+    color: #f1d68a; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px;
+  }
+  .toolbar { display: flex; gap: 10px; justify-content: flex-end; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .error { color: var(--danger); }
+  .ok { color: var(--ok); }
+  .warn { color: var(--warn); }
+  .progress {
+    height: 10px; border-radius: 999px; background: #1b1e22; border: 1px solid var(--line); overflow: hidden;
+  }
+  .progress > div {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #3d74e6, #6aa0ff);
+  }
+  .footer {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px;
+  }
+  .kpi {
+    display: flex; gap: 14px; color: var(--muted); font-size: 12px;
+  }
+  .hidden { display: none !important; }
+  .time-input { width: 92px; text-align: center; }
+  .muted { color: var(--muted); }
+  .empty {
+    border: 1px dashed var(--line); border-radius: 10px; padding: 18px; color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  @media (max-width: 860px) {
+    .cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .cols-2 { grid-template-columns: 1fr; }
+    .time-input { width: 86px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="titlebar">
+    <h1>Skipper</h1>
+    <div class="sub">删除片头片尾（原型）</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="select">1. 选择目录</div>
+    <div class="tab" data-tab="confirm">2. 确认时间</div>
+    <div class="tab" data-tab="progress">3. 导出结果</div>
+  </div>
+
+  <section id="page-select" class="page">
+    <div class="card">
+      <div class="grid cols-2">
+        <div>
+          <div class="label">目录</div>
+          <div class="row">
+            <button class="btn" id="pickDirBtn">选择目录</button>
+            <input class="grow" id="dirPath" type="text" value="" placeholder="尚未选择" readonly>
+          </div>
+          <div class="note">只读取该目录第一层，不进入子目录。</div>
+          <input id="dirInput" type="file" webkitdirectory hidden>
+        </div>
+        <div>
+          <div class="label">本批文件</div>
+          <div class="row" id="fileChips">
+            <div class="chip none">尚未读取</div>
+          </div>
+          <div class="note">文件名按名称排序展示。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content: space-between; margin-bottom: 10px;">
+        <div class="label" style="margin:0;">视频列表（可选其中一集作为标准）</div>
+        <div class="muted">标准视频需填写它的片头 / 片尾时间</div>
+      </div>
+      <div id="fileEmpty" class="empty">
+        <span>这个目录下没有可处理的视频</span>
+        <span class="muted">支持 mp4、mkv、avi、mov、webm、ts、m2ts、wmv、flv</span>
+      </div>
+      <div class="table-wrap hidden" id="fileTableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px;">标准</th>
+              <th>文件</th>
+              <th style="width:90px;">时长</th>
+            </tr>
+          </thead>
+          <tbody id="fileTbody"></tbody>
+        </table>
+      </div>
+      <div class="note" id="standardMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom: 12px;">
+        <div class="chip std hidden" id="standardChip"><span class="dot"></span><span id="standardName">标准视频</span></div>
+        <div class="muted">模板音频只取你填写的区间</div>
+      </div>
+
+      <div class="grid cols-4">
+        <div>
+          <div class="label">片头起点</div>
+          <input class="time-input" id="stdIntroStart" type="text" placeholder="00:00:00" disabled>
+        </div>
+        <div>
+          <div class="label">片头终点</div>
+          <input class="time-input" id="stdIntroEnd" type="text" placeholder="00:00:00" disabled>
+        </div>
+        <div>
+          <div class="label">片尾起点</div>
+          <input class="time-input" id="stdCreditsStart" type="text" placeholder="00:00:00" disabled>
+        </div>
+        <div>
+          <div class="label">片尾终点</div>
+          <input class="time-input" id="stdCreditsEnd" type="text" placeholder="00:00:00" disabled>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="kpi"><span>时间可留空；空表示不剪这一头</span></div>
+        <div class="toolbar">
+          <button class="btn ghost" id="clearStandardBtn" disabled>清空标准</button>
+          <button class="btn primary" id="startAnalyzeBtn" disabled>开始分析</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-confirm" class="page hidden">
+    <div class="card">
+      <div class="banner hidden" id="audioBanner">未能进行音频比对，已改用章节和黑帧</div>
+
+      <div class="row" style="margin-bottom: 10px; justify-content: space-between;">
+        <div class="label" style="margin:0;">分析结果（可修改后导出）</div>
+        <div class="muted">修改过的来源会显示为“手动”</div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:70px;">排除</th>
+              <th>文件</th>
+              <th style="width:80px;">时长</th>
+              <th style="width:90px;">片头起点</th>
+              <th style="width:90px;">片头终点</th>
+              <th style="width:90px;">片尾起点</th>
+              <th style="width:90px;">片尾终点</th>
+              <th style="width:120px;">来源</th>
+            </tr>
+          </thead>
+          <tbody id="planTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="note">两头都空的集不会被导出。</div>
+
+      <div class="footer">
+        <div class="kpi"><span>确认后导出到：output\</span></div>
+        <div class="toolbar">
+          <button class="btn" id="backToSelectBtn">返回选择</button>
+          <button class="btn primary" id="startExportBtn">开始导出</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-progress" class="page hidden">
+    <div class="card">
+      <div class="row" style="margin-bottom: 12px; justify-content: space-between;">
+        <div class="label" style="margin:0;">导出进度</div>
+        <div class="muted">阶段 序号/总数 文件名</div>
+      </div>
+
+      <div class="progress"><div id="progressBar"></div></div>
+      <div class="row" style="margin-top: 10px; justify-content: space-between;">
+        <div class="muted" id="progressText">等待导出</div>
+        <button class="btn" id="cancelBtn">取消</button>
+      </div>
+
+      <div style="height:14px"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:140px;">状态</th>
+              <th>文件</th>
+              <th style="width:220px;">说明</th>
+            </tr>
+          </thead>
+          <tbody id="resultTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer">
+        <div class="muted" id="cancelNote">有取消时：已取消，其余未处理</div>
+        <div class="toolbar">
+          <button class="btn primary" id="finishBtn" disabled>完成</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const VIDEO_EXTS = new Set(["mp4","mkv","avi","mov","webm","ts","m2ts","wmv","flv"]);
+
+  const pages = {
+    select: document.getElementById("page-select"),
+    confirm: document.getElementById("page-confirm"),
+    progress: document.getElementById("page-progress"),
+  };
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+
+  const state = {
+    dirName: "",
+    files: [],
+    standardIndex: -1,
+    analyzed: false,
+    audioUnavailable: false,
+    results: [],
+    exporting: false,
+    cancelled: false,
+    progressIndex: 0,
+    progressCount: 0,
+  };
+
+  function setPage(name) {
+    Object.entries(pages).forEach(([key, el]) => el.classList.toggle("hidden", key !== name));
+    tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  }
+
+  function extOf(name) {
+    const dot = name.lastIndexOf(".");
+    return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
+  }
+
+  function baseName(path) {
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || path;
+  }
+
+  function compareNames(a, b) {
+    return a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  }
+
+  function formatSeconds(sec) {
+    if (sec == null || Number.isNaN(sec)) return "";
+    const ms = Math.round(sec * 1000);
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    const milli = ms % 1000;
+    const pad = (n, w) => String(n).padStart(w, "0");
+    if (milli === 0) return `${pad(h,2)}:${pad(m,2)}:${pad(s,2)}`;
+    return `${pad(h,2)}:${pad(m,2)}:${pad(s,2)}.${pad(milli,3)}`;
+  }
+
+  function parseTime(text) {
+    const raw = (text || "").trim();
+    if (!raw) return { ok: true, value: null };
+    const re = /^(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?$|^(\d+)(?:\.(\d{1,3}))?$/;
+    const m = raw.match(re);
+    if (!m) return { ok: false, value: null };
+    if (m[5] !== undefined) {
+      const sec = Number(m[5]);
+      const frac = m[6] ? Number("0." + m[6].padEnd(3, "0")) : 0;
+      return { ok: true, value: sec + frac };
+    }
+    const h = m[1] ? Number(m[1]) : 0;
+    const mm = Number(m[2]);
+    const ss = Number(m[3]);
+    const frac = m[4] ? Number("0." + m[4].padEnd(3, "0")) : 0;
+    if (mm >= 60 || ss >= 60) return { ok: false, value: null };
+    return { ok: true, value: h * 3600 + mm * 60 + ss + frac };
+  }
+
+  function timeInputClass(el, invalid) {
+    el.classList.toggle("invalid", invalid);
+  }
+
+  function chipHTML(kind, label) {
+    const map = {
+      std: "chip std",
+      chap: "chip chap",
+      audio: "chip audio",
+      black: "chip black",
+      both: "chip both",
+      manual: "chip manual",
+      none: "chip none",
+    };
+    return `<span class="${map[kind]}"><span class="dot"></span>${label}</span>`;
+  }
+
+  function updateTabs() {
+    tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === currentPage()));
+  }
+
+  function currentPage() {
+    for (const [key, el] of Object.entries(pages)) {
+      if (!el.classList.contains("hidden")) return key;
+    }
+    return "select";
+  }
+
+  function setDir(path) {
+    state.dirName = path || "";
+    document.getElementById("dirPath").value = path || "";
+  }
+
+  function updateFileChips() {
+    const counts = {};
+    state.files.forEach(f => { const e = extOf(f.name); counts[e] = (counts[e] || 0) + 1; });
+    const keys = Object.keys(counts).sort();
+    const chips = keys.map(k => `<div class="chip">${k} · ${counts[k]} 个</div>`).join("");
+    document.getElementById("fileChips").innerHTML = chips || `<div class="chip none">尚未读取</div>`;
+  }
+
+  function renderFileList() {
+    const tbody = document.getElementById("fileTbody");
+    tbody.innerHTML = "";
+    state.files.forEach((f, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><div class="check ${state.standardIndex === i ? "on" : ""}" data-i="${i}">✓</div></td>
+        <td><div class="file"><div class="icon">▶</div><div class="meta"><b>${escapeHTML(f.name)}</b><span>${escapeHTML(f.dir || state.dirName || "")}</span></div></div></td>
+        <td class="time">${formatSeconds(f.durationSec)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll(".check").forEach(el => {
+      el.addEventListener("click", () => {
+        const i = Number(el.dataset.i);
+        state.standardIndex = state.standardIndex === i ? -1 : i;
+        state.analyzed = false;
+        renderFileList();
+        renderStandard();
+      });
+    });
+    const hasFiles = state.files.length > 0;
+    document.getElementById("fileTableWrap").classList.toggle("hidden", !hasFiles);
+    document.getElementById("fileEmpty").classList.toggle("hidden", hasFiles);
+    document.getElementById("startAnalyzeBtn").disabled = !hasFiles;
+    updateFileChips();
+  }
+
+  function renderStandard() {
+    const has = state.standardIndex >= 0;
+    const f = has ? state.files[state.standardIndex] : null;
+    document.getElementById("standardChip").classList.toggle("hidden", !has);
+    document.getElementById("standardName").textContent = has ? `标准视频：${f.name}` : "标准视频";
+    ["stdIntroStart","stdIntroEnd","stdCreditsStart","stdCreditsEnd"].forEach(id => {
+      document.getElementById(id).disabled = !has;
+    });
+    document.getElementById("clearStandardBtn").disabled = !has;
+    document.getElementById("standardMsg").textContent = "";
+  }
+
+  function collectStandard() {
+    if (state.standardIndex < 0) return null;
+    const startI = parseTime(document.getElementById("stdIntroStart").value);
+    const endI = parseTime(document.getElementById("stdIntroEnd").value);
+    const startC = parseTime(document.getElementById("stdCreditsStart").value);
+    const endC = parseTime(document.getElementById("stdCreditsEnd").value);
+    const map = [
+      { ok: startI.ok, el: "stdIntroStart" },
+      { ok: endI.ok, el: "stdIntroEnd" },
+      { ok: startC.ok, el: "stdCreditsStart" },
+      { ok: endC.ok, el: "stdCreditsEnd" },
+    ];
+    let invalid = false;
+    map.forEach(m => timeInputClass(document.getElementById(m.el), !m.ok));
+    map.forEach(m => { if (!m.ok) invalid = true; });
+    if (invalid) return { invalid: true };
+    const intro = { start: startI.value, end: endI.value };
+    const credits = { start: startC.value, end: endC.value };
+    const msg = document.getElementById("standardMsg");
+    msg.textContent = "";
+    if ((intro.start == null) !== (intro.end == null)) { msg.textContent = "片头时间不完整"; timeInputClass(document.getElementById("stdIntroStart"), intro.start == null); timeInputClass(document.getElementById("stdIntroEnd"), intro.end == null); return { invalid: true }; }
+    if ((credits.start == null) !== (credits.end == null)) { msg.textContent = "片尾时间不完整"; timeInputClass(document.getElementById("stdCreditsStart"), credits.start == null); timeInputClass(document.getElementById("stdCreditsEnd"), credits.end == null); return { invalid: true }; }
+    if (intro.start != null && !(intro.start < intro.end)) { msg.textContent = "片头起点要早于终点"; timeInputClass(document.getElementById("stdIntroStart"), true); return { invalid: true }; }
+    if (credits.start != null && !(credits.start < credits.end)) { msg.textContent = "片尾起点要早于终点"; timeInputClass(document.getElementById("stdCreditsStart"), true); return { invalid: true }; }
+    const dur = state.files[state.standardIndex].durationSec;
+    if (intro.start != null && (intro.start < 0 || intro.end > dur)) { msg.textContent = "片头时间超出时长"; timeInputClass(document.getElementById("stdIntroStart"), true); return { invalid: true }; }
+    if (credits.start != null && (credits.start < 0 || credits.end > dur)) { msg.textContent = "片尾时间超出时长"; timeInputClass(document.getElementById("stdCreditsStart"), true); return { invalid: true }; }
+    if (intro.end != null && credits.start != null && intro.end > credits.start) { msg.textContent = "片头终点不能晚于片尾起点"; timeInputClass(document.getElementById("stdIntroEnd"), true); return { invalid: true }; }
+    return {
+      invalid: false,
+      intro: intro.start == null ? null : { startSec: intro.start, endSec: intro.end },
+      credits: credits.start == null ? null : { startSec: credits.start, endSec: credits.end },
+    };
+  }
+
+  function sourceLabel(src) {
+    switch (src) {
+      case "Standard": return ["std", "标准"];
+      case "Chapter": return ["chap", "章节"];
+      case "Audio": return ["audio", "音频"];
+      case "BlackFrame": return ["black", "黑帧"];
+      case "BlackFrameAndAudio": return ["both", "黑帧+音频"];
+      case "Manual": return ["manual", "手动"];
+      default: return ["none", "未检出"];
+    }
+  }
+
+  function analyzeNow() {
+    const std = collectStandard();
+    if (std && std.invalid) return;
+    if (state.files.length === 0) return;
+    state.analyzed = true;
+    state.audioUnavailable = false;
+    document.getElementById("audioBanner").classList.add("hidden");
+    const stdFile = state.standardIndex >= 0 ? state.files[state.standardIndex] : null;
+    const plans = state.files.map((f, i) => {
+      let intro = null, credits = null, src = "none";
+      if (stdFile && i === state.standardIndex) {
+        if (std.intro) { intro = { ...std.intro, source: "Standard" }; }
+        if (std.credits) { credits = { ...std.credits, source: "Standard" }; }
+      } else if (stdFile && std.intro) {
+        intro = { startSec: std.intro.startSec, endSec: std.intro.endSec, source: "Standard" };
+        if (std.credits) credits = { startSec: std.credits.startSec, endSec: std.credits.endSec, source: "Standard" };
+      } else {
+        if (i % 3 === 0) {
+          intro = { startSec: 15, endSec: 95, source: "Chapter" };
+          credits = { startSec: f.durationSec - 105, endSec: f.durationSec - 20, source: "BlackFrameAndAudio" };
+        } else if (i % 3 === 1) {
+          intro = { startSec: 18, endSec: 98, source: "Audio" };
+          credits = { startSec: f.durationSec - 110, endSec: f.durationSec - 25, source: "BlackFrame" };
+        } else {
+          intro = null; credits = null;
+        }
+      }
+      return {
+        index: i,
+        path: f.path,
+        name: f.name,
+        dir: f.dir,
+        durationSec: f.durationSec,
+        intro,
+        credits,
+        excluded: false,
+        src,
+      };
+    });
+    renderPlans(plans);
+    setPage("confirm");
+  }
+
+  function renderPlans(plans) {
+    const tbody = document.getElementById("planTbody");
+    tbody.innerHTML = "";
+    plans.forEach((p, i) => {
+      const introTxt = p.intro ? formatSeconds(p.intro.startSec) : "";
+      const introEndTxt = p.intro ? formatSeconds(p.intro.endSec) : "";
+      const creditsTxt = p.credits ? formatSeconds(p.credits.startSec) : "";
+      const creditsEndTxt = p.credits ? formatSeconds(p.credits.endSec) : "";
+      const src = p.intro ? p.intro.source : (p.credits ? p.credits.source : null);
+      const [cls, label] = sourceLabel(src);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><div class="check ${p.excluded ? "on" : ""}" data-i="${i}">✓</div></td>
+        <td><div class="file"><div class="icon">▶</div><div class="meta"><b>${escapeHTML(p.name)}</b><span>已分析</span></div></div></td>
+        <td class="time">${formatSeconds(p.durationSec)}</td>
+        <td class="time"><input class="time-input" data-i="${i}" data-field="introStart" type="text" value="${introTxt}" placeholder=""></td>
+        <td class="time"><input class="time-input" data-i="${i}" data-field="introEnd" type="text" value="${introEndTxt}" placeholder=""></td>
+        <td class="time"><input class="time-input" data-i="${i}" data-field="creditsStart" type="text" value="${creditsTxt}" placeholder=""></td>
+        <td class="time"><input class="time-input" data-i="${i}" data-field="creditsEnd" type="text" value="${creditsEndTxt}" placeholder=""></td>
+        <td><span class="chip ${cls}"><span class="dot"></span>${label}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll(".check").forEach(el => {
+      el.addEventListener("click", () => {
+        const i = Number(el.dataset.i);
+        const p = state.plans[i];
+        p.excluded = !p.excluded;
+        el.classList.toggle("on", p.excluded);
+      });
+    });
+    tbody.querySelectorAll("input.time-input").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const i = Number(inp.dataset.i);
+        const field = inp.dataset.field;
+        const p = state.plans[i];
+        const t = parseTime(inp.value);
+        timeInputClass(inp, !t.ok);
+        if (!t.ok) return;
+        if (field === "introStart") p.intro = t.value == null ? (p.intro ? { ...p.intro, startSec: null } : null) : (p.intro ? { ...p.intro, startSec: t.value } : { startSec: t.value, endSec: null, source: "Manual" });
+        if (field === "introEnd") p.intro = t.value == null ? (p.intro ? { ...p.intro, endSec: null } : null) : (p.intro ? { ...p.intro, endSec: t.value } : { startSec: null, endSec: t.value, source: "Manual" });
+        if (field === "creditsStart") p.credits = t.value == null ? (p.credits ? { ...p.credits, startSec: null } : null) : (p.credits ? { ...p.credits, startSec: t.value } : { startSec: t.value, endSec: null, source: "Manual" });
+        if (field === "creditsEnd") p.credits = t.value == null ? (p.credits ? { ...p.credits, endSec: null } : null) : (p.credits ? { ...p.credits, endSec: t.value } : { startSec: null, endSec: t.value, source: "Manual" });
+        const anyIntro = p.intro && (p.intro.startSec != null || p.intro.endSec != null);
+        const anyCredits = p.credits && (p.credits.startSec != null || p.credits.endSec != null);
+        const src = anyIntro ? "Manual" : (anyCredits ? "Manual" : "none");
+        const cell = inp.closest("tr").children[7];
+        const [cls, label] = sourceLabel(src);
+        cell.innerHTML = `<span class="chip ${cls}"><span class="dot"></span>${label}</span>`;
+      });
+    });
+  }
+
+  function validatePlan(p) {
+    const dur = p.durationSec;
+    const bad = [];
+    function checkPair(a, b, fieldPrefix) {
+      if (a.startSec == null && a.endSec == null) return null;
+      if (a.startSec == null || a.endSec == null) return { field: fieldPrefix, code: "HalfEmpty" };
+      if (!(a.startSec < a.endSec)) return { field: fieldPrefix, code: "Order" };
+      if (a.startSec < 0 || a.endSec > dur) return { field: fieldPrefix, code: "OutOfRange" };
+      return null;
+    }
+    const iErr = p.intro ? checkPair(p.intro, p.intro, "Intro") : null;
+    const cErr = p.credits ? checkPair(p.credits, p.credits, "Credits") : null;
+    if (iErr) bad.push(iErr);
+    if (cErr) bad.push(cErr);
+    if (!bad.length && p.intro && p.credits && p.intro.endSec != null && p.credits.startSec != null && p.intro.endSec > p.credits.startSec) {
+      bad.push({ field: "Pair", code: "Overlap" });
+    }
+    return bad;
+  }
+
+  function startExport() {
+    if (!state.plans || !state.plans.length) return;
+    let hasError = false;
+    state.plans.forEach((p, i) => {
+      const row = document.querySelectorAll("#planTbody tr")[i];
+      ["introStart","introEnd","creditsStart","creditsEnd"].forEach(f => {
+        const el = row.querySelector(`input[data-field="${f}"]`);
+        timeInputClass(el, false);
+      });
+      if (p.excluded) return;
+      const errs = validatePlan(p);
+      errs.forEach(e => {
+        hasError = true;
+        const map = { Intro: "introStart", Credits: "creditsStart", Pair: "creditsStart" };
+        const el = row.querySelector(`input[data-field="${map[e.field] || "introStart"}"]`);
+        timeInputClass(el, true);
+      });
+    });
+    if (hasError) return;
+    state.results = [];
+    state.exporting = true;
+    state.cancelled = false;
+    state.progressIndex = 0;
+    state.progressCount = state.plans.length;
+    document.getElementById("cancelNote").classList.add("hidden");
+    document.getElementById("finishBtn").disabled = true;
+    setPage("progress");
+    runNextExport();
+  }
+
+  function stageLabel(stage) {
+    switch (stage) {
+      case "Export": return "导出";
+      default: return "导出";
+    }
+  }
+
+  function updateProgress() {
+    const bar = document.getElementById("progressBar");
+    const text = document.getElementById("progressText");
+    const pct = state.progressCount ? (state.progressIndex / state.progressCount) * 100 : 0;
+    bar.style.width = pct + "%";
+    const p = state.plans[state.progressIndex];
+    if (p) text.textContent = `${stageLabel("Export")} ${state.progressIndex + 1}/${state.progressCount} ${p.name}`;
+  }
+
+  function addResult(item) {
+    state.results.push(item);
+    const tbody = document.getElementById("resultTbody");
+    const tr = document.createElement("tr");
+    const statusCls = item.status === "Exported" ? "ok" : item.status === "Skipped" ? "warn" : "error";
+    const statusText = item.status === "Exported" ? "已导出" : item.status === "Excluded" ? "已排除" : item.status === "Skipped" ? "已跳过" : item.status === "Cancelled" ? "失败" : "失败";
+    tr.innerHTML = `
+      <td class="${statusCls}">${statusText}</td>
+      <td><div class="file"><div class="icon">▶</div><div class="meta"><b>${escapeHTML(item.name)}</b><span>${escapeHTML(item.note || "")}</span></div></div></td>
+      <td>${escapeHTML(item.reason || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function finishExport() {
+    state.exporting = false;
+    document.getElementById("progressText").textContent = state.cancelled ? "已取消" : "导出完成";
+    document.getElementById("progressBar").style.width = "100%";
+    document.getElementById("finishBtn").disabled = false;
+    if (state.cancelled) document.getElementById("cancelNote").classList.remove("hidden");
+  }
+
+  function runNextExport() {
+    if (!state.exporting) return;
+    if (state.cancelled) { finishExport(); return; }
+    if (state.progressIndex >= state.plans.length) { finishExport(); return; }
+    const p = state.plans[state.progressIndex];
+    updateProgress();
+    setTimeout(() => {
+      if (!state.exporting) return;
+      let item = null;
+      if (p.excluded) {
+        item = { name: p.name, status: "Excluded", note: "", reason: "已排除" };
+      } else if (!p.intro && !p.credits) {
+        item = { name: p.name, status: "Skipped", note: "未检出片头片尾", reason: "没有可剪的片头或片尾" };
+      } else {
+        item = { name: p.name, status: "Exported", note: `输出：output\\${baseName(p.name).replace(/\.[^.]+$/, "")}_trimmed${p.name.slice(p.name.lastIndexOf("."))}`, reason: "" };
+      }
+      addResult(item);
+      state.progressIndex += 1;
+      updateProgress();
+      runNextExport();
+    }, 650);
+  }
+
+  function cancelExport() {
+    if (!state.exporting) return;
+    state.cancelled = true;
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function fakeProbe(file) {
+    const base = 1380 + (file.name.length % 7) * 7;
+    return {
+      name: file.name,
+      path: file.webkitRelativePath ? file.webkitRelativePath.split("/").slice(0, -1).join("/") + "/" + file.name : file.name,
+      dir: "",
+      durationSec: base,
+    };
+  }
+
+  function loadFiles(files) {
+    const list = Array.from(files || []).filter(f => VIDEO_EXTS.has(extOf(f.name)));
+    list.sort((a, b) => compareNames(a.name, b.name));
+    state.files = list.map(fakeProbe);
+    state.standardIndex = -1;
+    state.analyzed = false;
+    renderFileList();
+    renderStandard();
+  }
+
+  function init() {
+    const params = new URLSearchParams(location.search);
+    const page = params.get("page") || "select";
+    setPage(page);
+
+    document.getElementById("pickDirBtn").addEventListener("click", () => document.getElementById("dirInput").click());
+    document.getElementById("dirInput").addEventListener("change", e => loadFiles(e.target.files));
+    document.getElementById("clearStandardBtn").addEventListener("click", () => { state.standardIndex = -1; renderFileList(); renderStandard(); });
+    document.getElementById("startAnalyzeBtn").addEventListener("click", analyzeNow);
+    document.getElementById("backToSelectBtn").addEventListener("click", () => setPage("select"));
+    document.getElementById("startExportBtn").addEventListener("click", startExport);
+    document.getElementById("cancelBtn").addEventListener("click", cancelExport);
+    document.getElementById("finishBtn").addEventListener("click", () => setPage("select"));
+
+    if (page !== "select") {
+      setDir("D:\\Media\\番剧\\第 1 季");
+      state.files = [
+        { name: "第01话.mp4", path: "D:\\Media\\番剧\\第 1 季\\第01话.mp4", dir: "D:\\Media\\番剧\\第 1 季", durationSec: 1422.1 },
+        { name: "第02话.mp4", path: "D:\\Media\\番剧\\第 1 季\\第02话.mp4", dir: "D:\\Media\\番剧\\第 1 季", durationSec: 1420.0 },
+        { name: "第03话.mkv", path: "D:\\Media\\番剧\\第 1 季\\第03话.mkv", dir: "D:\\Media\\番剧\\第 1 季", durationSec: 1421.8 },
+      ];
+      state.standardIndex = 1;
+      renderFileList();
+      renderStandard();
+      document.getElementById("stdIntroStart").value = "00:00:15";
+      document.getElementById("stdIntroEnd").value = "00:01:45";
+      document.getElementById("stdCreditsStart").value = "00:21:55";
+      document.getElementById("stdCreditsEnd").value = "00:23:10";
+      if (page === "confirm") analyzeNow();
+      if (page === "progress") {
+        state.plans = [
+          { index: 0, path: state.files[0].path, name: state.files[0].name, durationSec: state.files[0].durationSec, intro: { startSec: 15, endSec: 95, source: "Standard" }, credits: { startSec: 1315, endSec: 1390, source: "Standard" }, excluded: false },
+          { index: 1, path: state.files[1].path, name: state.files[1].name, durationSec: state.files[1].durationSec, intro: { startSec: 15, endSec: 95, source: "Standard" }, credits: { startSec: 1315, endSec: 1390, source: "Standard" }, excluded: false },
+          { index: 2, path: state.files[2].path, name: state.files[2].name, durationSec: state.files[2].durationSec, intro: null, credits: null, excluded: false },
+        ];
+        startExport();
+      }
+    }
+    updateTabs();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
