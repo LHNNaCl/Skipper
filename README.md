@@ -13,7 +13,7 @@ Windows 桌面程序。选定一个目录后，把该目录第一层的视频当
 
 分析可以取消。导出取消时保留已经写完的新文件，正在写的那一集会删掉临时文件。
 
-运行时从 PATH 查找 `ffmpeg.exe` 和 `ffprobe.exe`。音频指纹优先使用 FFmpeg 的 chromaprint 复用器，否则使用 `fpcalc.exe`。两者都没有时，音频比对跳过，章节和黑帧继续进行，确认页会说明这一点。
+运行时先在程序所在目录查找 `ffmpeg.exe` 和 `ffprobe.exe`，找不到再查 PATH。音频指纹优先使用 FFmpeg 的 chromaprint 复用器，否则使用 `fpcalc.exe`。两者都没有时，音频比对跳过，章节和黑帧继续进行，确认页会说明这一点。
 
 ## 环境
 
@@ -22,8 +22,7 @@ Windows 桌面程序。选定一个目录后，把该目录第一层的视频当
 | CMake 3.21 及以上 | `D:\Install\CMake` | 生成器使用 MinGW Makefiles |
 | Qt 6 Widgets | `C:\Install\Qt\6.5.3\mingw_64` | 本仓库按 6.5.3 编过 |
 | MinGW g++（GCC 11.2） | `C:\Install\Qt\Tools\mingw1120_64` | 必须和上面这套 Qt 是同一套 MinGW |
-| FFmpeg | `D:\Install\FFmpeg\bin` | 需要 `ffmpeg.exe`、`ffprobe.exe` |
-| Chromaprint（可选） | PATH 上的 `fpcalc.exe`，或带 chromaprint 复用器的 FFmpeg | 没有时跳过音频比对 |
+| FFmpeg | `third_party/ffmpeg-2026-11-09-git-16a345b022-full_build/bin` | gyan.dev full 构建，含 chromaprint。安装包只带 `ffmpeg.exe`、`ffprobe.exe` |
 
 Qt 6.5.3 的 `mingw_64` 库按 GCC 11.2 构建。编译器换成其他 GCC 后无法和这套 Qt 链接。CMake、`g++` 和 Qt 的 `bin` 都要在配置与编译时的 PATH 里。
 
@@ -52,7 +51,7 @@ cmake --build build -j 8
 & "C:\Install\Qt\6.5.3\mingw_64\bin\windeployqt.exe" --compiler-runtime --no-translations "build\skipper.exe"
 ```
 
-部署完成后，从资源管理器直接打开 `build\skipper.exe` 即可。FFmpeg 仍要从 PATH 能找到。
+部署完成后，从资源管理器直接打开 `build\skipper.exe` 即可。编译时会把上述 full 构建的 `ffmpeg.exe` 和 `ffprobe.exe` 复制到 `build\`。
 
 改过源码后，保持同一个 PATH，再执行一次 `cmake --build build -j 8`。
 

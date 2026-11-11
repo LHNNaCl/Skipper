@@ -15,6 +15,7 @@ class QLineEdit;
 class QProgressBar;
 class QPushButton;
 class QStackedWidget;
+class QSystemTrayIcon;
 class QTableWidget;
 
 namespace skipper {
@@ -50,6 +51,9 @@ class MainWindow : public QMainWindow {
 
   void buildUi();
   void applyStyle();
+  void setupTray();
+  void showFromTray();
+  void quitFromTray();
   QWidget* buildSelectPage();
   QWidget* buildConfirmPage();
   QWidget* buildProgressPage();
@@ -63,6 +67,7 @@ class MainWindow : public QMainWindow {
   void backToSelect();
   void finishToSelect();
   void showSelectMessage(const QString& text);
+  void syncLiveResults(const Progress& progress);
   void highlightStandard(const std::vector<FieldError>& errors);
   void buildConfirm(const AnalyzeResult& result);
   void updateSource(int row);
@@ -72,6 +77,8 @@ class MainWindow : public QMainWindow {
   QLineEdit* timeEdit();
 
   Controller* controller_ = nullptr;
+  QSystemTrayIcon* tray_ = nullptr;
+  bool quitting_ = false;
   QStackedWidget* stack_ = nullptr;
   QLabel* stepBadges_[3] = {};
   QLabel* stepTexts_[3] = {};
@@ -81,11 +88,15 @@ class MainWindow : public QMainWindow {
   QLabel* selectMessage_ = nullptr;
   QTableWidget* fileTable_ = nullptr;
   QButtonGroup* standardGroup_ = nullptr;
-  QLabel* standardChip_ = nullptr;
+  QWidget* standardChip_ = nullptr;
   QLineEdit* stdIntroStart_ = nullptr;
   QLineEdit* stdIntroEnd_ = nullptr;
   QLineEdit* stdCreditsStart_ = nullptr;
   QLineEdit* stdCreditsEnd_ = nullptr;
+  QCheckBox* methodStandard_ = nullptr;
+  QCheckBox* methodChapter_ = nullptr;
+  QCheckBox* methodAudio_ = nullptr;
+  QCheckBox* methodBlack_ = nullptr;
   QPushButton* analyzeButton_ = nullptr;
   QLabel* selectCount_ = nullptr;
 
@@ -98,7 +109,7 @@ class MainWindow : public QMainWindow {
   std::vector<ConfirmRow> rows_;
 
   QLabel* progressTitle_ = nullptr;
-  QLabel* progressChip_ = nullptr;
+  QWidget* progressChip_ = nullptr;
   QProgressBar* bar_ = nullptr;
   QLabel* progressLabel_ = nullptr;
   QLabel* outputPathLabel_ = nullptr;
@@ -112,6 +123,8 @@ class MainWindow : public QMainWindow {
   std::string directory_;
   std::vector<std::string> files_;
   bool sawWork_ = false;
+  bool liveListReady_ = false;
+  Stage liveStage_ = Stage::Probe;
 };
 
 }  // namespace skipper

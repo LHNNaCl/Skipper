@@ -47,15 +47,17 @@ std::vector<std::string> Controller::listDirectory(const std::string& directory)
   return listing.list(directory);
 }
 
-void Controller::analyze(const std::string& directory, const std::optional<StandardMark>& standard) {
+void Controller::analyze(const std::string& directory,
+                         const std::optional<StandardMark>& standard,
+                         const DetectionMethods& methods) {
   if (busy_ || closing_.load()) return;
   busy_ = true;
   token_.reset();
   QMetaObject::invokeMethod(
       worker_,
-      [this, directory, standard] {
+      [this, directory, standard, methods] {
         auto result = worker_->session.analyze(
-            directory, standard,
+            directory, standard, methods,
             [this](const Progress& progress) {
               const Progress copy = progress;
               QMetaObject::invokeMethod(

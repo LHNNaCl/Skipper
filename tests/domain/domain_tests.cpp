@@ -273,6 +273,29 @@ TEST_CASE("resolve picks one segment per side") {
   expectSegment(marked[1].intro, 0, 10, SegmentSource::Standard);
   expectSegment(marked[2].intro, 30, 80, SegmentSource::Chapter);
 
+  DetectionMethods noChapter;
+  noChapter.chapter = false;
+  noChapter.audio = false;
+  auto withoutChapter = resolve({chaptered, other}, std::nullopt, limits, noChapter);
+  expectSegment(withoutChapter[0].credits, 1700, 1760, SegmentSource::BlackFrame);
+  CHECK_FALSE(withoutChapter[1].credits);
+
+  DetectionMethods onlyAudio;
+  onlyAudio.standard = false;
+  onlyAudio.chapter = false;
+  onlyAudio.blackFrame = false;
+  auto audioOnly = resolve({chaptered, other}, std::nullopt, limits, onlyAudio);
+  expectSegment(audioOnly[0].credits, 1800, 1840, SegmentSource::Audio);
+
+  DetectionMethods none;
+  none.standard = false;
+  none.chapter = false;
+  none.audio = false;
+  none.blackFrame = false;
+  auto ignored = resolve({standardEp, good, bad}, mark, limits, none);
+  CHECK_FALSE(ignored[0].intro);
+  CHECK_FALSE(ignored[2].intro);
+
   EpisodeEvidence host = episode("s.mkv", 300);
   EpisodeEvidence guest = episode("g.mkv", 300);
   guest.introWindow = print(0, 10, sequence(1, 20));

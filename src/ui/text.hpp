@@ -21,13 +21,18 @@ inline constexpr const char* kIntroEnd = "片头终点";
 inline constexpr const char* kCreditsStart = "片尾起点";
 inline constexpr const char* kCreditsEnd = "片尾终点";
 inline constexpr const char* kAnalyzeHint = "只填一个时间或时间超出时长时，不能开始分析";
+inline constexpr const char* kMethods = "定位手段";
+inline constexpr const char* kMethodStandard = "标准";
+inline constexpr const char* kMethodChapter = "章节";
+inline constexpr const char* kMethodAudio = "音频";
+inline constexpr const char* kMethodBlack = "黑帧";
 inline constexpr const char* kClearStandard = "清空标准";
 inline constexpr const char* kAnalyze = "开始分析";
 inline constexpr const char* kNoVideos = "这个目录下没有可处理的视频";
 inline constexpr const char* kStandardInvalid = "标准时间不正确";
 inline constexpr const char* kStandardUnreadable = "无法读取标准视频";
 inline constexpr const char* kBadTime = "时间格式不正确";
-inline constexpr const char* kAudioSkipped = "未能进行音频比对，已改用章节和黑帧";
+inline constexpr const char* kAudioSkipped = "未能进行音频比对，已改用其余已选手段";
 inline constexpr const char* kResults = "分析结果（可修改后导出）";
 inline constexpr const char* kManualHint = "修改过的来源会显示为「手动」";
 inline constexpr const char* kExclude = "排除";
@@ -45,6 +50,8 @@ inline constexpr const char* kDone = "完成";
 inline constexpr const char* kCancelledNote = "已取消，其余未处理";
 inline constexpr const char* kCannotCreateOutput = "无法创建输出目录";
 inline constexpr const char* kRunning = "进行中";
+inline constexpr const char* kWaiting = "等待";
+inline constexpr const char* kProcessed = "已处理";
 inline constexpr const char* kCancelling = "正在取消";
 inline constexpr const char* kAllDone = "全部完成";
 inline constexpr const char* kCancelled = "已取消";
@@ -58,6 +65,8 @@ inline constexpr const char* kOverlap = "片头终点不能晚于片尾起点";
 inline constexpr const char* kStepSelect = "选择目录";
 inline constexpr const char* kStepConfirm = "确认时间";
 inline constexpr const char* kStepResult = "导出结果";
+inline constexpr const char* kShowMainWindow = "显示主界面";
+inline constexpr const char* kQuit = "退出";
 
 inline const char* stage(Stage value) {
   switch (value) {

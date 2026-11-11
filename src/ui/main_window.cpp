@@ -6,21 +6,30 @@
 #include "ui/text.hpp"
 #include "ui/time_format.hpp"
 
+#include <QAction>
+#include <QApplication>
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QColor>
 #include <QFileDialog>
+#include <QFontMetrics>
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QRadioButton>
 #include <QRegularExpression>
 #include <QStackedWidget>
+#include <QStyle>
+#include <QSystemTrayIcon>
 #include <QTableWidget>
 #include <QVBoxLayout>
 
@@ -53,12 +62,64 @@ QPushButton* button(const char* text, bool primary) {
   return widget;
 }
 
-QLabel* chipLabel(const QString& text, const QString& kind) {
+class ElideLabel : public QLabel {
+ public:
+  explicit ElideLabel(QWidget* parent = nullptr) : QLabel(parent) {
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+  }
+
+  void setFullText(const QString& text) {
+    full_ = text;
+    setToolTip(text);
+    updateText();
+  }
+
+ protected:
+  void resizeEvent(QResizeEvent* event) override {
+    QLabel::resizeEvent(event);
+    updateText();
+  }
+
+ private:
+  void updateText() {
+    const QString next = QFontMetrics(font()).elidedText(full_, Qt::ElideMiddle, qMax(8, width()));
+    if (text() != next) QLabel::setText(next);
+  }
+
+  QString full_;
+};
+
+void restyle(QWidget* widget);
+
+QWidget* chipLabel(const QString& text, const QString& kind) {
+  auto* chip = new QWidget;
+  chip->setObjectName("chip");
+  chip->setProperty("kind", kind);
+  chip->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+  auto* layout = new QHBoxLayout(chip);
+  layout->setContentsMargins(9, 2, 9, 2);
+  layout->setSpacing(6);
+  auto* dot = new QLabel;
+  dot->setObjectName("chipDot");
+  dot->setFixedSize(7, 7);
+  if (kind == QStringLiteral("plain")) dot->hide();
   auto* label = new QLabel(text);
-  label->setObjectName("chip");
-  label->setProperty("kind", kind);
-  label->setAlignment(Qt::AlignCenter);
-  return label;
+  label->setObjectName("chipText");
+  layout->addWidget(dot);
+  layout->addWidget(label);
+  return chip;
+}
+
+void setChip(QWidget* chip, const QString& text, const QString& kind) {
+  chip->setProperty("kind", kind);
+  if (auto* label = chip->findChild<QLabel*>("chipText")) label->setText(text);
+  restyle(chip);
+  for (auto* child : chip->findChildren<QWidget*>()) restyle(child);
+}
+
+void setElided(QLabel* label, const QString& text) {
+  if (auto* elide = dynamic_cast<ElideLabel*>(label)) elide->setFullText(text);
+  else label->setText(text);
 }
 
 void restyle(QWidget* widget) {
@@ -93,11 +154,53 @@ MainWindow::MainWindow() {
   buildUi();
   applyStyle();
   setStep(0);
+  setupTray();
+}
+
+void MainWindow::setupTray() {
+  QIcon icon(QStringLiteral(":/icons/skipper.png"));
+  if (icon.isNull()) icon = style()->standardIcon(QStyle::SP_DesktopIcon);
+  setWindowIcon(icon);
+  if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
+
+  tray_ = new QSystemTrayIcon(icon, qApp);
+  tray_->setToolTip(QStringLiteral("Skipper"));
+
+  auto* menu = new QMenu(this);
+  auto* showAction = menu->addAction(u8(text::kShowMainWindow));
+  auto* quitAction = menu->addAction(u8(text::kQuit));
+  connect(showAction, &QAction::triggered, this, &MainWindow::showFromTray);
+  connect(quitAction, &QAction::triggered, this, &MainWindow::quitFromTray);
+  connect(tray_, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+    if (reason == QSystemTrayIcon::DoubleClick) showFromTray();
+  });
+  tray_->setContextMenu(menu);
+  tray_->show();
+}
+
+void MainWindow::showFromTray() {
+  if (isMinimized()) showNormal();
+  show();
+  raise();
+  activateWindow();
+}
+
+void MainWindow::quitFromTray() {
+  quitting_ = true;
+  controller_->shutdown();
+  QApplication::quit();
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
+  if (!quitting_ && tray_ != nullptr) {
+    event->ignore();
+    hide();
+    tray_->show();
+    return;
+  }
   controller_->shutdown();
-  QMainWindow::closeEvent(event);
+  event->accept();
+  QApplication::quit();
 }
 
 void MainWindow::buildUi() {
@@ -221,6 +324,20 @@ QWidget* MainWindow::buildSelectPage() {
   }
   times->setColumnStretch(4, 1);
   stdLayout->addLayout(times);
+  auto* methods = new QHBoxLayout;
+  methods->setSpacing(16);
+  methods->addWidget(caption(text::kMethods));
+  methodStandard_ = new QCheckBox(u8(text::kMethodStandard));
+  methodChapter_ = new QCheckBox(u8(text::kMethodChapter));
+  methodAudio_ = new QCheckBox(u8(text::kMethodAudio));
+  methodBlack_ = new QCheckBox(u8(text::kMethodBlack));
+  for (QCheckBox* box : {methodStandard_, methodChapter_, methodAudio_, methodBlack_}) {
+    box->setChecked(true);
+    methods->addWidget(box);
+  }
+  connect(methodStandard_, &QCheckBox::toggled, this, [this](bool) { refreshStandard(); });
+  methods->addStretch();
+  stdLayout->addLayout(methods);
   auto* footer = new QHBoxLayout;
   auto* hint = new QLabel(u8(text::kAnalyzeHint));
   hint->setObjectName("note");
@@ -309,8 +426,12 @@ QWidget* MainWindow::buildProgressPage() {
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(12);
   auto* top = panel();
+  top->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
   auto* topLayout = new QVBoxLayout(top);
+  topLayout->setContentsMargins(16, 14, 16, 14);
+  topLayout->setSpacing(8);
   auto* head = new QHBoxLayout;
+  head->setAlignment(Qt::AlignVCenter);
   progressTitle_ = caption(text::kProgress);
   progressChip_ = chipLabel(u8(text::kRunning), "info");
   head->addWidget(progressTitle_);
@@ -320,30 +441,27 @@ QWidget* MainWindow::buildProgressPage() {
   bar_ = new QProgressBar;
   bar_->setRange(0, 100);
   bar_->setTextVisible(false);
-  bar_->setFixedHeight(10);
+  bar_->setFixedHeight(8);
   topLayout->addWidget(bar_);
   auto* row = new QHBoxLayout;
-  progressLabel_ = new QLabel;
-  progressLabel_->setObjectName("body");
-  outputPathLabel_ = new QLabel;
+  row->setSpacing(16);
+  progressLabel_ = new ElideLabel;
+  progressLabel_->setObjectName("progressLine");
+  outputPathLabel_ = new ElideLabel;
   outputPathLabel_->setObjectName("note");
   row->addWidget(progressLabel_, 1);
-  row->addWidget(outputPathLabel_);
-  topLayout->addLayout(row);
-  auto* actions = new QHBoxLayout;
-  actions->addStretch();
+  row->addWidget(outputPathLabel_, 1);
   cancelButton_ = button(text::kCancel, false);
-  doneButton_ = button(text::kDone, true);
-  doneButton_->hide();
   connect(cancelButton_, &QPushButton::clicked, this, [this] { controller_->cancel(); });
-  connect(doneButton_, &QPushButton::clicked, this, &MainWindow::finishToSelect);
-  actions->addWidget(cancelButton_);
-  actions->addWidget(doneButton_);
-  topLayout->addLayout(actions);
+  row->addWidget(cancelButton_);
+  topLayout->addLayout(row);
   layout->addWidget(top);
 
   resultPanel_ = panel();
+  resultPanel_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
   auto* resultLayout = new QVBoxLayout(resultPanel_);
+  resultLayout->setContentsMargins(16, 14, 16, 14);
+  resultLayout->setSpacing(12);
   resultTable_ = new QTableWidget(0, 3);
   resultTable_->setHorizontalHeaderLabels({u8("状态"), u8(text::kFile), u8("说明")});
   resultTable_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
@@ -361,10 +479,17 @@ QWidget* MainWindow::buildProgressPage() {
   resultNote_->setObjectName("message");
   resultNote_->hide();
   resultLayout->addWidget(resultNote_);
+  auto* footer = new QHBoxLayout;
+  footer->setSpacing(16);
   resultSummary_ = new QLabel;
-  resultSummary_->setObjectName("body");
+  resultSummary_->setObjectName("progressLine");
   resultSummary_->setTextFormat(Qt::RichText);
-  resultLayout->addWidget(resultSummary_);
+  doneButton_ = button(text::kDone, true);
+  doneButton_->hide();
+  connect(doneButton_, &QPushButton::clicked, this, &MainWindow::finishToSelect);
+  footer->addWidget(resultSummary_, 1);
+  footer->addWidget(doneButton_);
+  resultLayout->addLayout(footer);
   layout->addWidget(resultPanel_, 1);
   resultPanel_->hide();
   return page;
@@ -444,15 +569,12 @@ void MainWindow::clearStandard() {
 void MainWindow::refreshStandard() {
   const int row = standardGroup_->checkedId();
   const bool chosen = row >= 0 && row < static_cast<int>(files_.size());
-  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) edit->setEnabled(chosen);
-  if (!chosen) {
-    standardChip_->setText(u8(text::kNoStandard));
-    standardChip_->setProperty("kind", "muted");
-  } else {
-    standardChip_->setText(u8(text::kStandardPrefix) + fromStd(fileNameOf(files_[static_cast<std::size_t>(row)])));
-    standardChip_->setProperty("kind", "std");
+  const bool useStandard = methodStandard_ && methodStandard_->isChecked();
+  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) {
+    edit->setEnabled(chosen && useStandard);
   }
-  restyle(standardChip_);
+  if (!chosen) setChip(standardChip_, u8(text::kNoStandard), "muted");
+  else setChip(standardChip_, u8(text::kStandardPrefix) + fromStd(fileNameOf(files_[static_cast<std::size_t>(row)])), "std");
 }
 
 void MainWindow::startAnalyze() {
@@ -461,7 +583,7 @@ void MainWindow::startAnalyze() {
   for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) setFieldError(edit, false, {});
   const int row = standardGroup_->checkedId();
   std::optional<StandardMark> mark;
-  if (row >= 0) {
+  if (methodStandard_->isChecked() && row >= 0) {
     QLineEdit* edits[] = {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_};
     bool bad = false;
     for (QLineEdit* edit : edits) {
@@ -490,9 +612,15 @@ void MainWindow::startAnalyze() {
   analyzeButton_->setEnabled(false);
   exportButton_->setEnabled(false);
   sawWork_ = false;
+  liveListReady_ = false;
   resultPanel_->hide();
   resultNote_->hide();
-  controller_->analyze(directory_, mark);
+  DetectionMethods methods;
+  methods.standard = methodStandard_->isChecked();
+  methods.chapter = methodChapter_->isChecked();
+  methods.audio = methodAudio_->isChecked();
+  methods.blackFrame = methodBlack_->isChecked();
+  controller_->analyze(directory_, mark, methods);
 }
 
 void MainWindow::showProgress(const Progress& progress) {
@@ -500,20 +628,91 @@ void MainWindow::showProgress(const Progress& progress) {
   stack_->setCurrentIndex(2);
   setStep(progress.stage == Stage::Export ? 2 : 1);
   progressTitle_->setText(u8(progress.stage == Stage::Export ? text::kProgress : text::kAnalyzing));
-  progressChip_->setText(u8(text::kRunning));
-  progressChip_->setProperty("kind", "info");
-  restyle(progressChip_);
-  progressLabel_->setText(u8(text::stage(progress.stage)) + QString("  %1/%2  %3")
-                                                        .arg(progress.index)
-                                                        .arg(progress.count)
-                                                        .arg(fromStd(progress.name)));
+  setChip(progressChip_, u8(text::kRunning), "info");
+  setElided(progressLabel_, u8(text::stage(progress.stage)) + QString("  %1/%2  %3")
+                                                              .arg(progress.index)
+                                                              .arg(progress.count)
+                                                              .arg(fromStd(progress.name)));
   bar_->setObjectName("");
   bar_->setValue(progress.count <= 0 ? 0 : progress.index * 100 / progress.count);
   restyle(bar_);
-  outputPathLabel_->setText(u8(text::kOutputDir) + "  " + fromStd(directory_) + "\\output");
+  setElided(outputPathLabel_, u8(text::kOutputDir) + "  " + fromStd(directory_) + "\\output");
   cancelButton_->show();
   doneButton_->hide();
-  resultPanel_->hide();
+  resultPanel_->show();
+  syncLiveResults(progress);
+}
+
+void MainWindow::syncLiveResults(const Progress& progress) {
+  std::vector<std::string> names;
+  if (progress.stage == Stage::Export) {
+    for (const ConfirmRow& row : rows_) names.push_back(fileNameOf(row.path));
+  }
+  if (names.empty()) {
+    for (const std::string& path : files_) names.push_back(fileNameOf(path));
+  }
+  const bool rebuild = !liveListReady_ || liveStage_ != progress.stage ||
+                       resultTable_->rowCount() != static_cast<int>(names.size());
+  if (rebuild) {
+    liveStage_ = progress.stage;
+    liveListReady_ = true;
+    resultTable_->setRowCount(0);
+    for (int row = 0; row < static_cast<int>(names.size()); ++row) {
+      resultTable_->insertRow(row);
+      resultTable_->setRowHeight(row, 52);
+      auto* status = chipLabel(u8(text::kWaiting), "muted");
+      auto* holder = new QWidget;
+      auto* holderLayout = new QHBoxLayout(holder);
+      holderLayout->setContentsMargins(8, 0, 0, 0);
+      holderLayout->addWidget(status);
+      holderLayout->addStretch();
+      resultTable_->setCellWidget(row, 0, holder);
+      resultTable_->setCellWidget(row, 1, fileCell(fromStd(names[static_cast<std::size_t>(row)]), u8(text::kUntouched), nullptr));
+      auto* detail = new QTableWidgetItem;
+      detail->setFlags(Qt::ItemIsEnabled);
+      detail->setForeground(QColor("#98a0a9"));
+      resultTable_->setItem(row, 2, detail);
+    }
+  }
+
+  int current = -1;
+  for (int row = 0; row < static_cast<int>(names.size()); ++row) {
+    if (names[static_cast<std::size_t>(row)] == progress.name) {
+      current = row;
+      break;
+    }
+  }
+  if (current < 0 && progress.index >= 1 && progress.index <= static_cast<int>(names.size())) current = progress.index - 1;
+
+  int done = 0;
+  int waiting = 0;
+  for (int row = 0; row < resultTable_->rowCount(); ++row) {
+    auto* holder = resultTable_->cellWidget(row, 0);
+    auto* chip = holder == nullptr ? nullptr : holder->findChild<QWidget*>("chip");
+    auto* detail = resultTable_->item(row, 2);
+    if (chip == nullptr) continue;
+    if (row == current) {
+      setChip(chip, u8(text::kRunning), "info");
+      if (detail != nullptr) detail->setText(u8(text::stage(progress.stage)));
+    } else if (current >= 0 && row < current) {
+      setChip(chip, u8(text::kProcessed), "muted");
+      if (detail != nullptr) detail->setText(u8(text::stage(progress.stage)));
+      ++done;
+    } else {
+      setChip(chip, u8(text::kWaiting), "muted");
+      if (detail != nullptr) detail->setText({});
+      ++waiting;
+    }
+  }
+  if (current >= 0 && resultTable_->item(current, 2) != nullptr) {
+    resultTable_->scrollToItem(resultTable_->item(current, 2), QAbstractItemView::PositionAtCenter);
+  }
+  resultNote_->hide();
+  resultSummary_->setText(
+      QString::fromUtf8("已处理 <b>%1</b>    进行中 <b style='color:#4f8cff'>%2</b>    等待 <b>%3</b>")
+          .arg(done)
+          .arg(current >= 0 ? 1 : 0)
+          .arg(waiting));
 }
 
 void MainWindow::showAnalyzeResult(const AnalyzeResult& result) {
@@ -535,9 +734,7 @@ void MainWindow::showAnalyzeResult(const AnalyzeResult& result) {
   if (result.reason == Reason::Cancelled) {
     stack_->setCurrentIndex(2);
     setStep(1);
-    progressChip_->setText(u8(text::kCancelled));
-    progressChip_->setProperty("kind", "warn");
-    restyle(progressChip_);
+    setChip(progressChip_, u8(text::kCancelled), "warn");
     resultNote_->setText(u8(text::kCancelledNote));
     resultNote_->show();
     resultPanel_->show();
@@ -565,15 +762,14 @@ void MainWindow::showExportResult(const ExportResult& result) {
   }
   stack_->setCurrentIndex(2);
   setStep(2);
+  liveListReady_ = false;
   resultPanel_->show();
   cancelButton_->hide();
   doneButton_->show();
   bar_->setValue(100);
   bar_->setObjectName(result.cancelled ? "" : "done");
   restyle(bar_);
-  progressChip_->setText(u8(result.cancelled ? text::kCancelled : text::kAllDone));
-  progressChip_->setProperty("kind", result.cancelled ? "warn" : "ok");
-  restyle(progressChip_);
+  setChip(progressChip_, u8(result.cancelled ? text::kCancelled : text::kAllDone), result.cancelled ? "warn" : "ok");
   resultNote_->setVisible(result.cancelled || (result.batchReason == Reason::ExportFailed && result.items.empty()));
   if (result.batchReason == Reason::ExportFailed && result.items.empty()) resultNote_->setText(u8(text::kCannotCreateOutput));
   else if (result.cancelled) resultNote_->setText(u8(text::kCancelledNote));
@@ -600,6 +796,7 @@ void MainWindow::showExportResult(const ExportResult& result) {
     resultTable_->setCellWidget(row, 1, fileCell(fromStd(item.name), subtitle, nullptr));
     auto* detail = new QTableWidgetItem(u8(text::detail(item.status, item.reason)));
     detail->setFlags(Qt::ItemIsEnabled);
+    detail->setForeground(QColor("#98a0a9"));
     resultTable_->setItem(row, 2, detail);
     if (item.status == ItemStatus::Exported) ++exported;
     else if (item.status == ItemStatus::Excluded) ++excluded;
@@ -870,8 +1067,12 @@ QLineEdit* MainWindow::timeEdit() {
 void MainWindow::applyStyle() {
   setStyleSheet(QString::fromUtf8(R"(
     QMainWindow, QWidget { background: #14171b; color: #e8eaec; }
+    QMenu { background: #1a1e23; color: #e8eaec; border: 1px solid #2b3138; }
+    QMenu::item { padding: 6px 28px 6px 16px; background: transparent; }
+    QMenu::item:selected { background: #2a3038; }
     QFrame#panel { background: #1a1e23; border: 1px solid #2b3138; border-radius: 10px; }
-    QLabel#caption { color: #98a0a9; font-size: 12px; }
+    QLabel#caption { color: #98a0a9; font-size: 12px; background: transparent; }
+    QLabel#progressLine { color: #98a0a9; font-size: 12px; background: transparent; }
     QLabel#note { color: #6b727b; font-size: 12px; }
     QLabel#body { color: #c9ced4; }
     QLabel#path { background: #20242a; border: 1px solid #2b3138; border-radius: 7px; padding: 6px 10px; color: #c9ced4; }
@@ -884,7 +1085,7 @@ void MainWindow::applyStyle() {
     QLabel#stepText[state="on"] { color: #e8eaec; font-weight: 600; }
     QLabel#stepText[state="off"], QLabel#stepText[state="done"] { color: #98a0a9; }
     QFrame#stepLine { background: #343b44; border: none; }
-    QPushButton { background: #20242a; color: #e8eaec; border: 1px solid #343b44; border-radius: 7px; padding: 7px 14px; }
+    QCheckBox { color: #e8eaec; spacing: 6px; background: transparent; }
     QPushButton:hover { background: #2a3038; }
     QPushButton:disabled { color: #6b727b; background: #1b1f24; }
     QPushButton#primary { background: #3f7ef2; border-color: #3f7ef2; color: white; font-weight: 600; }
@@ -900,19 +1101,44 @@ void MainWindow::applyStyle() {
     QLabel#fileIcon { background: #23272d; border: 1px solid #2b3138; border-radius: 6px; color: #c8cdd2; }
     QLabel#fileName { color: #e8eaec; font-weight: 600; }
     QLabel#fileName[dim="true"] { color: #6b727b; }
-    QLabel#chip { border-radius: 10px; padding: 3px 9px; background: #23272d; border: 1px solid #2b3138; color: #d3d7db; }
-    QLabel#chip[kind="muted"] { color: #9aa1a8; }
-    QLabel#chip[kind="std"] { background: rgba(79,140,255,0.12); border-color: rgba(79,140,255,0.4); color: #a9c6ff; }
-    QLabel#chip[kind="chap"] { background: rgba(106,208,255,0.10); border-color: rgba(106,208,255,0.35); color: #9fdcff; }
-    QLabel#chip[kind="audio"] { background: rgba(143,123,255,0.10); border-color: rgba(143,123,255,0.35); color: #bfb1ff; }
-    QLabel#chip[kind="black"] { background: rgba(154,161,168,0.10); border-color: rgba(154,161,168,0.35); color: #c3c8ce; }
-    QLabel#chip[kind="both"] { background: rgba(143,123,255,0.10); border-color: rgba(143,123,255,0.35); color: #c3bcdd; }
-    QLabel#chip[kind="manual"] { background: rgba(224,179,79,0.10); border-color: rgba(224,179,79,0.35); color: #ecd29a; }
-    QLabel#chip[kind="none"] { color: #7d848d; }
-    QLabel#chip[kind="ok"] { background: rgba(69,201,122,0.10); border-color: rgba(69,201,122,0.35); color: #8fe0b2; }
-    QLabel#chip[kind="warn"] { background: rgba(224,179,79,0.10); border-color: rgba(224,179,79,0.35); color: #ecd29a; }
-    QLabel#chip[kind="danger"] { background: rgba(229,100,95,0.10); border-color: rgba(229,100,95,0.35); color: #f0a19d; }
-    QLabel#chip[kind="info"] { background: rgba(79,140,255,0.12); border-color: rgba(79,140,255,0.4); color: #a9c6ff; }
+    QWidget#chip { border-radius: 11px; background: #23272d; border: 1px solid #2b3138; }
+    QWidget#chip QLabel { background: transparent; border: none; color: #d3d7db; font-size: 12px; }
+    QLabel#chipDot { border-radius: 3px; background: #6b727b; }
+    QWidget#chip[kind="muted"] QLabel#chipText { color: #9aa1a8; }
+    QWidget#chip[kind="muted"] QLabel#chipDot { background: #9aa1a8; }
+    QWidget#chip[kind="std"] { background: rgba(79,140,255,0.12); border-color: rgba(79,140,255,0.4); }
+    QWidget#chip[kind="std"] QLabel#chipText { color: #a9c6ff; }
+    QWidget#chip[kind="std"] QLabel#chipDot { background: #4f8cff; }
+    QWidget#chip[kind="chap"] { background: rgba(106,208,255,0.10); border-color: rgba(106,208,255,0.35); }
+    QWidget#chip[kind="chap"] QLabel#chipText { color: #9fdcff; }
+    QWidget#chip[kind="chap"] QLabel#chipDot { background: #6ad0ff; }
+    QWidget#chip[kind="audio"] { background: rgba(143,123,255,0.10); border-color: rgba(143,123,255,0.35); }
+    QWidget#chip[kind="audio"] QLabel#chipText { color: #bfb1ff; }
+    QWidget#chip[kind="audio"] QLabel#chipDot { background: #8f7bff; }
+    QWidget#chip[kind="black"] { background: rgba(154,161,168,0.10); border-color: rgba(154,161,168,0.35); }
+    QWidget#chip[kind="black"] QLabel#chipText { color: #c3c8ce; }
+    QWidget#chip[kind="black"] QLabel#chipDot { background: #9aa1a8; }
+    QWidget#chip[kind="both"] { background: rgba(143,123,255,0.10); border-color: rgba(143,123,255,0.35); }
+    QWidget#chip[kind="both"] QLabel#chipText { color: #c3bcdd; }
+    QWidget#chip[kind="both"] QLabel#chipDot { background: #8f7bff; }
+    QWidget#chip[kind="manual"] { background: rgba(224,179,79,0.10); border-color: rgba(224,179,79,0.35); }
+    QWidget#chip[kind="manual"] QLabel#chipText { color: #ecd29a; }
+    QWidget#chip[kind="manual"] QLabel#chipDot { background: #e0b34f; }
+    QWidget#chip[kind="none"] QLabel#chipText { color: #7d848d; }
+    QWidget#chip[kind="none"] QLabel#chipDot { background: #7d848d; }
+    QWidget#chip[kind="ok"] { background: rgba(69,201,122,0.10); border-color: rgba(69,201,122,0.35); }
+    QWidget#chip[kind="ok"] QLabel#chipText { color: #8fe0b2; }
+    QWidget#chip[kind="ok"] QLabel#chipDot { background: #45c97a; }
+    QWidget#chip[kind="warn"] { background: rgba(224,179,79,0.10); border-color: rgba(224,179,79,0.35); }
+    QWidget#chip[kind="warn"] QLabel#chipText { color: #ecd29a; }
+    QWidget#chip[kind="warn"] QLabel#chipDot { background: #e0b34f; }
+    QWidget#chip[kind="danger"] { background: rgba(229,100,95,0.10); border-color: rgba(229,100,95,0.35); }
+    QWidget#chip[kind="danger"] QLabel#chipText { color: #f0a19d; }
+    QWidget#chip[kind="danger"] QLabel#chipDot { background: #e5645f; }
+    QWidget#chip[kind="info"] { background: rgba(79,140,255,0.12); border-color: rgba(79,140,255,0.4); }
+    QWidget#chip[kind="info"] QLabel#chipText { color: #a9c6ff; }
+    QWidget#chip[kind="info"] QLabel#chipDot { background: #4f8cff; }
+    QWidget#chip[kind="plain"] QLabel#chipDot { background: transparent; }
     QProgressBar { background: #1b1f24; border: 1px solid #2b3138; border-radius: 5px; }
     QProgressBar::chunk { background: #4f8cff; border-radius: 4px; }
     QProgressBar#done::chunk { background: #45c97a; }

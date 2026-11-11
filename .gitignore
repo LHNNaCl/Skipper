@@ -4,8 +4,8 @@ cmake-build-*/
 out/
 
 # Bundled FFmpeg binaries are too large for GitHub (>100MB each).
-# Install FFmpeg on PATH, or place ffmpeg.exe/ffprobe.exe under third_party/ffmpeg locally.
 third_party/ffmpeg/
+third_party/ffmpeg-*/
 
 # CMake
 CMakeCache.txt

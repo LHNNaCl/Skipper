@@ -16,6 +16,7 @@ class FfmpegExport final : public VideoExport {
 
  private:
   WriteStatus from(const ProcessRunner::Result& result, CancelToken& cancel) const;
+  double seekSlack(const std::string& source, double startSec, CancelToken& cancel) const;
   WriteStatus cut(const std::string& source, const TimeRange& range, const std::string& dest, CancelToken& cancel);
 
   ProcessRunner& runner_;

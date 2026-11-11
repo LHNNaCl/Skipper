@@ -22,6 +22,8 @@ add_library(doctest::doctest ALIAS doctest)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 qt_standard_project_setup()
+# Qt 6.5 turns on AUTOMOC and AUTOUIC only. The tray icon is a Qt resource.
+set(CMAKE_AUTORCC ON)
 
 add_library(skipper_domain
   src/domain/window.cpp
@@ -62,12 +64,14 @@ add_executable(skipper
   src/ui/time_format.cpp
   src/ui/controller.cpp
   src/ui/main_window.cpp
+  icons/skipper.qrc
+  icons/skipper.rc
 )
 target_link_libraries(skipper PRIVATE skipper_domain skipper_application skipper_infrastructure Qt6::Widgets)
 set_target_properties(skipper PROPERTIES AUTOMOC ON WIN32_EXECUTABLE ON)
 
-# Bundled FFmpeg lives under third_party/ffmpeg and is copied next to skipper.exe.
-set(SKIPPER_FFMPEG_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg)
+# Full FFmpeg build (with chromaprint) is copied next to skipper.exe.
+set(SKIPPER_FFMPEG_DIR ${CMAKE_SOURCE_DIR}/third_party/ffmpeg-2026-11-09-git-16a345b022-full_build/bin)
 foreach(tool IN ITEMS ffmpeg.exe ffprobe.exe)
   if(EXISTS ${SKIPPER_FFMPEG_DIR}/${tool})
     add_custom_command(TARGET skipper POST_BUILD

@@ -21,7 +21,9 @@ class Controller : public QObject {
   ~Controller() override;
 
   std::vector<std::string> listDirectory(const std::string& directory);
-  void analyze(const std::string& directory, const std::optional<StandardMark>& standard);
+  void analyze(const std::string& directory,
+               const std::optional<StandardMark>& standard,
+               const DetectionMethods& methods);
   void exportConfirmed(const std::vector<ConfirmedEpisode>& episodes);
   void cancel();
   void shutdown();
