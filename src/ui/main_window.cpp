@@ -164,7 +164,6 @@ void MainWindow::setupTray() {
   if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
 
   tray_ = new QSystemTrayIcon(icon, qApp);
-  tray_->setToolTip(QStringLiteral("Skipper"));
 
   auto* menu = new QMenu(this);
   auto* showAction = menu->addAction(u8(text::kShowMainWindow));
@@ -176,6 +175,8 @@ void MainWindow::setupTray() {
   });
   tray_->setContextMenu(menu);
   tray_->show();
+  // Windows 11 drops a tip registered before the tray icon's version is set.
+  tray_->setToolTip(u8(text::kTrayTip));
 }
 
 void MainWindow::showFromTray() {

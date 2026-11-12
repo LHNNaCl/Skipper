@@ -65,6 +65,7 @@ inline constexpr const char* kOverlap = "片头终点不能晚于片尾起点";
 inline constexpr const char* kStepSelect = "选择目录";
 inline constexpr const char* kStepConfirm = "确认时间";
 inline constexpr const char* kStepResult = "导出结果";
+inline constexpr const char* kTrayTip = "Skipper — 剪掉片头和片尾";
 inline constexpr const char* kShowMainWindow = "显示主界面";
 inline constexpr const char* kQuit = "退出";
 
