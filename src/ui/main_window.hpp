@@ -93,10 +93,6 @@ class MainWindow : public QMainWindow {
   QLineEdit* stdIntroEnd_ = nullptr;
   QLineEdit* stdCreditsStart_ = nullptr;
   QLineEdit* stdCreditsEnd_ = nullptr;
-  QCheckBox* methodStandard_ = nullptr;
-  QCheckBox* methodChapter_ = nullptr;
-  QCheckBox* methodAudio_ = nullptr;
-  QCheckBox* methodBlack_ = nullptr;
   QPushButton* analyzeButton_ = nullptr;
   QLabel* selectCount_ = nullptr;
 

@@ -62,13 +62,12 @@ std::optional<Segment> combineCredits(const std::optional<TimeRange>& black,
 
 std::vector<EpisodePlan> resolve(const std::vector<EpisodeEvidence>& episodes,
                                  const std::optional<StandardEvidence>& standard,
-                                 const DetectionLimits& limits,
-                                 const DetectionMethods& methods) {
+                                 const DetectionLimits& limits) {
   const int count = static_cast<int>(episodes.size());
   std::vector<Window> introWindows(static_cast<std::size_t>(count));
   std::vector<Window> creditsWindows(static_cast<std::size_t>(count));
-  const bool hasIntroStandard = methods.standard && standard && standard->intro.has_value();
-  const bool hasCreditsStandard = methods.standard && standard && standard->credits.has_value();
+  const bool hasIntroStandard = standard && standard->intro.has_value();
+  const bool hasCreditsStandard = standard && standard->credits.has_value();
   const double introTemplateLen = hasIntroStandard ? lengthOf(*standard->intro) : 0;
   const double creditsTemplateLen = hasCreditsStandard ? lengthOf(*standard->credits) : 0;
 
@@ -88,26 +87,24 @@ std::vector<EpisodePlan> resolve(const std::vector<EpisodeEvidence>& episodes,
 
   std::vector<std::optional<TimeRange>> introChapters(static_cast<std::size_t>(count));
   std::vector<std::optional<TimeRange>> creditsChapters(static_cast<std::size_t>(count));
-  if (methods.chapter) {
-    for (int i = 0; i < count; ++i) {
-      introChapters[static_cast<std::size_t>(i)] =
-          pickChapter(episodes[static_cast<std::size_t>(i)].chapters,
-                      introWindows[static_cast<std::size_t>(i)], true, limits);
-      creditsChapters[static_cast<std::size_t>(i)] =
-          pickChapter(episodes[static_cast<std::size_t>(i)].chapters,
-                      creditsWindows[static_cast<std::size_t>(i)], false, limits);
-    }
+  for (int i = 0; i < count; ++i) {
+    introChapters[static_cast<std::size_t>(i)] =
+        pickChapter(episodes[static_cast<std::size_t>(i)].chapters,
+                    introWindows[static_cast<std::size_t>(i)], true, limits);
+    creditsChapters[static_cast<std::size_t>(i)] =
+        pickChapter(episodes[static_cast<std::size_t>(i)].chapters,
+                    creditsWindows[static_cast<std::size_t>(i)], false, limits);
   }
 
   std::vector<std::optional<TimeRange>> introAudio(static_cast<std::size_t>(count));
   std::vector<std::optional<TimeRange>> creditsAudio(static_cast<std::size_t>(count));
-  if (methods.audio && !hasIntroStandard) {
+  if (!hasIntroStandard) {
     std::vector<std::optional<Fingerprint>> prints;
     prints.reserve(static_cast<std::size_t>(count));
     for (const auto& episode : episodes) prints.push_back(episode.introWindow);
     introAudio = bestPairwise(prints, introWindows, limits);
   }
-  if (methods.audio && !hasCreditsStandard) {
+  if (!hasCreditsStandard) {
     std::vector<std::optional<Fingerprint>> prints;
     prints.reserve(static_cast<std::size_t>(count));
     for (const auto& episode : episodes) prints.push_back(episode.creditsWindow);
@@ -137,13 +134,11 @@ std::vector<EpisodePlan> resolve(const std::vector<EpisodeEvidence>& episodes,
   }
 
   std::vector<std::optional<TimeRange>> black(static_cast<std::size_t>(count));
-  if (methods.blackFrame) {
-    for (int i = 0; i < count; ++i) {
-      black[static_cast<std::size_t>(i)] =
-          pickBlackFrame(episodes[static_cast<std::size_t>(i)].creditsVisual,
-                         creditsWindows[static_cast<std::size_t>(i)],
-                         episodes[static_cast<std::size_t>(i)].durationSec, limits);
-    }
+  for (int i = 0; i < count; ++i) {
+    black[static_cast<std::size_t>(i)] =
+        pickBlackFrame(episodes[static_cast<std::size_t>(i)].creditsVisual,
+                       creditsWindows[static_cast<std::size_t>(i)],
+                       episodes[static_cast<std::size_t>(i)].durationSec, limits);
   }
 
   std::vector<EpisodePlan> plans;

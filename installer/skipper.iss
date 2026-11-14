@@ -3,7 +3,7 @@
 
 #define AppVersion "0.1"
 #define BuildDir "..\build"
-#define FfmpegDir "..\third_party\ffmpeg"
+#define FfmpegDir "..\third_party\ffmpeg-2026-11-09-git-16a345b022-full_build\bin"
 
 [Setup]
 AppId={{7C2E9B14-5A6D-4F38-8E21-0B9D4C6A1E75}
@@ -32,7 +32,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "ChineseSimplified.isl"
+Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
 Source: "{#BuildDir}\skipper.exe"; DestDir: "{app}"; Flags: ignoreversion

@@ -6,23 +6,31 @@
 
 namespace skipper {
 
-std::vector<TimeRange> planKeepRanges(double duration,
-                                      const std::optional<TimeRange>& intro,
-                                      const std::optional<TimeRange>& credits,
-                                      std::vector<double> keyframes) {
+constexpr double kMinSideSec = 10;
+
+std::vector<KeptPart> planKeepRanges(double duration,
+                                     const std::optional<TimeRange>& intro,
+                                     const std::optional<TimeRange>& credits,
+                                     std::vector<double> keyframes) {
   if (duration < 0) duration = 0;
 
   struct Piece {
+    int part = 0;
     double start = 0;
     double end = 0;
   };
   std::vector<Piece> logical;
-  if (intro && intro->startSec > kTimeEpsilon) logical.push_back(Piece{0, intro->startSec});
+  if (intro && intro->startSec > kTimeEpsilon && !nearlyLess(intro->startSec, kMinSideSec)) {
+    logical.push_back(Piece{1, 0, intro->startSec});
+  }
   const double bodyStart = intro ? intro->endSec : 0;
   const double bodyEnd = credits ? credits->startSec : duration;
-  if (nearlyLess(bodyStart, bodyEnd)) logical.push_back(Piece{bodyStart, bodyEnd});
-  if (credits && duration - credits->endSec > kTimeEpsilon) {
-    logical.push_back(Piece{credits->endSec, duration});
+  if (nearlyLess(bodyStart, bodyEnd)) logical.push_back(Piece{2, bodyStart, bodyEnd});
+  if (credits) {
+    const double tail = duration - credits->endSec;
+    if (tail > kTimeEpsilon && !nearlyLess(tail, kMinSideSec)) {
+      logical.push_back(Piece{3, credits->endSec, duration});
+    }
   }
 
   keyframes.push_back(0);
@@ -51,25 +59,13 @@ std::vector<TimeRange> planKeepRanges(double duration,
     return duration;
   };
 
-  std::vector<TimeRange> aligned;
+  std::vector<KeptPart> parts;
   for (const Piece& piece : logical) {
     const double start = floorKey(piece.start);
     const double end = ceilKey(piece.end);
-    if (nearlyLess(start, end)) aligned.push_back(TimeRange{start, end});
+    if (nearlyLess(start, end)) parts.push_back(KeptPart{piece.part, TimeRange{start, end}});
   }
-  std::sort(aligned.begin(), aligned.end(), [](const TimeRange& a, const TimeRange& b) {
-    return a.startSec < b.startSec;
-  });
-
-  std::vector<TimeRange> merged;
-  for (const TimeRange& range : aligned) {
-    if (!merged.empty() && !nearlyLess(merged.back().endSec, range.startSec)) {
-      merged.back().endSec = std::max(merged.back().endSec, range.endSec);
-    } else {
-      merged.push_back(range);
-    }
-  }
-  return merged;
+  return parts;
 }
 
 }  // namespace skipper

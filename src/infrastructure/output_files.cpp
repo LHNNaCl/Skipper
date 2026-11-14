@@ -28,8 +28,13 @@ bool OutputFilesFs::createOutputDir(const std::string& directory) {
 
 bool OutputFilesFs::renameToFinal(const std::string& temp, const std::string& finalPath) {
   std::error_code error;
-  if (std::filesystem::exists(fsPath(finalPath), error)) return false;
-  std::filesystem::rename(fsPath(temp), fsPath(finalPath), error);
+  const auto dest = fsPath(finalPath);
+  if (std::filesystem::exists(dest, error)) {
+    std::filesystem::remove(dest, error);
+    if (error) return false;
+  }
+  error.clear();
+  std::filesystem::rename(fsPath(temp), dest, error);
   return !error;
 }
 

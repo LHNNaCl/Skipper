@@ -164,6 +164,7 @@ void MainWindow::setupTray() {
   if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
 
   tray_ = new QSystemTrayIcon(icon, qApp);
+  tray_->setToolTip(QStringLiteral("Skipper"));
 
   auto* menu = new QMenu(this);
   auto* showAction = menu->addAction(u8(text::kShowMainWindow));
@@ -175,8 +176,6 @@ void MainWindow::setupTray() {
   });
   tray_->setContextMenu(menu);
   tray_->show();
-  // Windows 11 drops a tip registered before the tray icon's version is set.
-  tray_->setToolTip(u8(text::kTrayTip));
 }
 
 void MainWindow::showFromTray() {
@@ -325,20 +324,6 @@ QWidget* MainWindow::buildSelectPage() {
   }
   times->setColumnStretch(4, 1);
   stdLayout->addLayout(times);
-  auto* methods = new QHBoxLayout;
-  methods->setSpacing(16);
-  methods->addWidget(caption(text::kMethods));
-  methodStandard_ = new QCheckBox(u8(text::kMethodStandard));
-  methodChapter_ = new QCheckBox(u8(text::kMethodChapter));
-  methodAudio_ = new QCheckBox(u8(text::kMethodAudio));
-  methodBlack_ = new QCheckBox(u8(text::kMethodBlack));
-  for (QCheckBox* box : {methodStandard_, methodChapter_, methodAudio_, methodBlack_}) {
-    box->setChecked(true);
-    methods->addWidget(box);
-  }
-  connect(methodStandard_, &QCheckBox::toggled, this, [this](bool) { refreshStandard(); });
-  methods->addStretch();
-  stdLayout->addLayout(methods);
   auto* footer = new QHBoxLayout;
   auto* hint = new QLabel(u8(text::kAnalyzeHint));
   hint->setObjectName("note");
@@ -570,10 +555,7 @@ void MainWindow::clearStandard() {
 void MainWindow::refreshStandard() {
   const int row = standardGroup_->checkedId();
   const bool chosen = row >= 0 && row < static_cast<int>(files_.size());
-  const bool useStandard = methodStandard_ && methodStandard_->isChecked();
-  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) {
-    edit->setEnabled(chosen && useStandard);
-  }
+  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) edit->setEnabled(chosen);
   if (!chosen) setChip(standardChip_, u8(text::kNoStandard), "muted");
   else setChip(standardChip_, u8(text::kStandardPrefix) + fromStd(fileNameOf(files_[static_cast<std::size_t>(row)])), "std");
 }
@@ -584,7 +566,7 @@ void MainWindow::startAnalyze() {
   for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) setFieldError(edit, false, {});
   const int row = standardGroup_->checkedId();
   std::optional<StandardMark> mark;
-  if (methodStandard_->isChecked() && row >= 0) {
+  if (row >= 0) {
     QLineEdit* edits[] = {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_};
     bool bad = false;
     for (QLineEdit* edit : edits) {
@@ -616,12 +598,7 @@ void MainWindow::startAnalyze() {
   liveListReady_ = false;
   resultPanel_->hide();
   resultNote_->hide();
-  DetectionMethods methods;
-  methods.standard = methodStandard_->isChecked();
-  methods.chapter = methodChapter_->isChecked();
-  methods.audio = methodAudio_->isChecked();
-  methods.blackFrame = methodBlack_->isChecked();
-  controller_->analyze(directory_, mark, methods);
+  controller_->analyze(directory_, mark);
 }
 
 void MainWindow::showProgress(const Progress& progress) {
@@ -783,7 +760,6 @@ void MainWindow::showExportResult(const ExportResult& result) {
   for (int row = 0; row < static_cast<int>(result.items.size()); ++row) {
     const ItemResult& item = result.items[static_cast<std::size_t>(row)];
     resultTable_->insertRow(row);
-    resultTable_->setRowHeight(row, 52);
     auto* status = chipLabel(u8(text::status(item.status)), text::statusKind(item.status));
     auto* holder = new QWidget;
     auto* holderLayout = new QHBoxLayout(holder);
@@ -791,9 +767,16 @@ void MainWindow::showExportResult(const ExportResult& result) {
     holderLayout->addWidget(status);
     holderLayout->addStretch();
     resultTable_->setCellWidget(row, 0, holder);
-    const QString subtitle = item.status == ItemStatus::Exported
-                                 ? QString("output\\") + fromStd(outputFileName(item.name))
-                                 : u8(text::kUntouched);
+    QString subtitle = u8(text::kUntouched);
+    if (!item.outputNames.empty()) {
+      subtitle.clear();
+      for (const std::string& outputName : item.outputNames) {
+        if (!subtitle.isEmpty()) subtitle += QChar('\n');
+        subtitle += QString("output\\") + fromStd(outputName);
+      }
+    }
+    const int lines = static_cast<int>(item.outputNames.size());
+    resultTable_->setRowHeight(row, lines > 1 ? 36 + lines * 16 : 52);
     resultTable_->setCellWidget(row, 1, fileCell(fromStd(item.name), subtitle, nullptr));
     auto* detail = new QTableWidgetItem(u8(text::detail(item.status, item.reason)));
     detail->setFlags(Qt::ItemIsEnabled);
@@ -1086,7 +1069,7 @@ void MainWindow::applyStyle() {
     QLabel#stepText[state="on"] { color: #e8eaec; font-weight: 600; }
     QLabel#stepText[state="off"], QLabel#stepText[state="done"] { color: #98a0a9; }
     QFrame#stepLine { background: #343b44; border: none; }
-    QCheckBox { color: #e8eaec; spacing: 6px; background: transparent; }
+    QPushButton { background: #20242a; color: #e8eaec; border: 1px solid #343b44; border-radius: 7px; padding: 7px 14px; }
     QPushButton:hover { background: #2a3038; }
     QPushButton:disabled { color: #6b727b; background: #1b1f24; }
     QPushButton#primary { background: #3f7ef2; border-color: #3f7ef2; color: white; font-weight: 600; }

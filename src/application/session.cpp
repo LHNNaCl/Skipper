@@ -53,7 +53,6 @@ void Session::report(const std::function<void(const Progress&)>& progress, const
 
 AnalyzeResult Session::analyze(const std::string& directory,
                                const std::optional<StandardMark>& standard,
-                               const DetectionMethods& methods,
                                const std::function<void(const Progress&)>& progress,
                                CancelToken& cancel) {
   const DetectionLimits limits;
@@ -64,7 +63,7 @@ AnalyzeResult Session::analyze(const std::string& directory,
     return result;
   }
 
-  std::optional<StandardMark> mark = methods.standard ? standard : std::nullopt;
+  std::optional<StandardMark> mark = standard;
   std::optional<ProbeInfo> standardProbe;
   std::optional<TimeRange> standardIntro;
   std::optional<TimeRange> standardCredits;
@@ -100,8 +99,7 @@ AnalyzeResult Session::analyze(const std::string& directory,
   }
 
   if (cancel.cancelled()) return cancelledResult();
-  const bool wantAudio = methods.audio || (methods.standard && (standardIntro.has_value() || standardCredits.has_value()));
-  const bool audio = wantAudio && probe_.chromaprintAvailable(cancel);
+  const bool audio = probe_.chromaprintAvailable(cancel);
   if (cancel.cancelled()) return cancelledResult();
 
   struct Item {
@@ -148,10 +146,10 @@ AnalyzeResult Session::analyze(const std::string& directory,
 
   std::optional<Fingerprint> introTemplate;
   std::optional<Fingerprint> creditsTemplate;
-  const bool introTemplateWanted = audio && methods.standard && standardIntro.has_value();
-  const bool creditsTemplateWanted = audio && methods.standard && standardCredits.has_value();
-  const bool introPairs = audio && methods.audio && !standardIntro && items.size() >= 2;
-  const bool creditsPairs = audio && methods.audio && !standardCredits && items.size() >= 2;
+  const bool introTemplateWanted = audio && standardIntro.has_value();
+  const bool creditsTemplateWanted = audio && standardCredits.has_value();
+  const bool introPairs = audio && !standardIntro && items.size() >= 2;
+  const bool creditsPairs = audio && !standardCredits && items.size() >= 2;
 
   if (audio && (introTemplateWanted || creditsTemplateWanted || introPairs || creditsPairs)) {
     if (introTemplateWanted && mark) {
@@ -192,12 +190,10 @@ AnalyzeResult Session::analyze(const std::string& directory,
   }
 
   std::vector<int> visualIndex;
-  if (methods.blackFrame) {
-    for (int index = 0; index < static_cast<int>(items.size()); ++index) {
-      const bool isStandard = mark && items[static_cast<std::size_t>(index)].evidence.path == mark->path;
-      if (standardCredits && isStandard) continue;
-      visualIndex.push_back(index);
-    }
+  for (int index = 0; index < static_cast<int>(items.size()); ++index) {
+    const bool isStandard = mark && items[static_cast<std::size_t>(index)].evidence.path == mark->path;
+    if (standardCredits && isStandard) continue;
+    visualIndex.push_back(index);
   }
   const int visualCount = static_cast<int>(visualIndex.size());
   for (int step = 0; step < visualCount; ++step) {
@@ -237,9 +233,9 @@ AnalyzeResult Session::analyze(const std::string& directory,
 
   AnalyzeResult result;
   result.reason = Reason::None;
-  result.plans = resolve(evidence, standardEvidence, limits, methods);
+  result.plans = resolve(evidence, standardEvidence, limits);
   result.failures = std::move(failures);
-  result.audioUnavailable = wantAudio && !audio;
+  result.audioUnavailable = !audio;
 
   directory_ = directory;
   durations_.clear();
@@ -285,12 +281,6 @@ ExportResult Session::exportConfirmed(const std::vector<ConfirmedEpisode>& confi
       result.items.push_back(ItemResult{item.path, name, ItemStatus::Skipped, Reason::NoSegments});
       continue;
     }
-    const std::string finalPath = files_.finalPath(directory_, outputFileName(name));
-    const std::string temp = files_.tempPath(finalPath);
-    if (files_.exists(finalPath)) {
-      result.items.push_back(ItemResult{item.path, name, ItemStatus::Skipped, Reason::OutputExists});
-      continue;
-    }
     const auto duration = durations_.find(item.path);
     if (duration == durations_.end()) {
       result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::CannotRead});
@@ -310,7 +300,6 @@ ExportResult Session::exportConfirmed(const std::vector<ConfirmedEpisode>& confi
     }
     auto frames = probe_.keyframes(item.path, duration->second, cuts, cancel);
     if (cancel.cancelled()) {
-      files_.removeFile(temp);
       result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::Cancelled});
       result.cancelled = true;
       break;
@@ -319,29 +308,44 @@ ExportResult Session::exportConfirmed(const std::vector<ConfirmedEpisode>& confi
       result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::ExportFailed});
       continue;
     }
-    auto ranges = planKeepRanges(duration->second, intro, credits, *frames);
-    if (ranges.empty()) {
+    auto parts = planKeepRanges(duration->second, intro, credits, *frames);
+    if (parts.empty()) {
       result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::ExportFailed});
       continue;
     }
-    const WriteStatus status = videoExport_.write(item.path, temp, ranges, cancel);
-    if (status == WriteStatus::Cancelled || cancel.cancelled()) {
-      files_.removeFile(temp);
-      result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::Cancelled});
-      result.cancelled = true;
-      break;
+
+    ItemResult row{item.path, name, ItemStatus::Exported, Reason::None};
+    bool stopBatch = false;
+    for (const KeptPart& part : parts) {
+      if (cancel.cancelled()) {
+        row.status = ItemStatus::Failed;
+        row.reason = Reason::Cancelled;
+        result.cancelled = true;
+        stopBatch = true;
+        break;
+      }
+      const std::string outputName = outputFileName(name, part.part);
+      const std::string finalPath = files_.finalPath(directory_, outputName);
+      const std::string temp = files_.tempPath(finalPath);
+      const WriteStatus status = videoExport_.write(item.path, temp, {part.range}, cancel);
+      if (status == WriteStatus::Cancelled || cancel.cancelled()) {
+        files_.removeFile(temp);
+        row.status = ItemStatus::Failed;
+        row.reason = Reason::Cancelled;
+        result.cancelled = true;
+        stopBatch = true;
+        break;
+      }
+      if (status != WriteStatus::Ok || !files_.renameToFinal(temp, finalPath)) {
+        files_.removeFile(temp);
+        row.status = ItemStatus::Failed;
+        row.reason = Reason::ExportFailed;
+        break;
+      }
+      row.outputNames.push_back(outputName);
     }
-    if (status != WriteStatus::Ok) {
-      files_.removeFile(temp);
-      result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::ExportFailed});
-      continue;
-    }
-    if (!files_.renameToFinal(temp, finalPath)) {
-      files_.removeFile(temp);
-      result.items.push_back(ItemResult{item.path, name, ItemStatus::Failed, Reason::ExportFailed});
-      continue;
-    }
-    result.items.push_back(ItemResult{item.path, name, ItemStatus::Exported, Reason::None});
+    result.items.push_back(std::move(row));
+    if (stopBatch) break;
   }
   return result;
 }

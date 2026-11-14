@@ -99,9 +99,9 @@ TEST_CASE("search windows") {
 }
 
 TEST_CASE("output file name keeps the extension") {
-  CHECK(outputFileName("ep01.mkv") == "ep01_trimmed.mkv");
-  CHECK(outputFileName("file.MP4") == "file_trimmed.MP4");
-  CHECK(outputFileName("archive.tar.mkv") == "archive.tar_trimmed.mkv");
+  CHECK(outputFileName("ep01.mkv", 1) == "ep01_1.mkv");
+  CHECK(outputFileName("file.MP4", 2) == "file_2.MP4");
+  CHECK(outputFileName("archive.tar.mkv", 3) == "archive.tar_3.mkv");
   CHECK(fileNameOf("D:/show/ep01.mkv") == "ep01.mkv");
   CHECK(fileNameOf("D:\\show\\ep01.mkv") == "ep01.mkv");
 }
@@ -273,29 +273,6 @@ TEST_CASE("resolve picks one segment per side") {
   expectSegment(marked[1].intro, 0, 10, SegmentSource::Standard);
   expectSegment(marked[2].intro, 30, 80, SegmentSource::Chapter);
 
-  DetectionMethods noChapter;
-  noChapter.chapter = false;
-  noChapter.audio = false;
-  auto withoutChapter = resolve({chaptered, other}, std::nullopt, limits, noChapter);
-  expectSegment(withoutChapter[0].credits, 1700, 1760, SegmentSource::BlackFrame);
-  CHECK_FALSE(withoutChapter[1].credits);
-
-  DetectionMethods onlyAudio;
-  onlyAudio.standard = false;
-  onlyAudio.chapter = false;
-  onlyAudio.blackFrame = false;
-  auto audioOnly = resolve({chaptered, other}, std::nullopt, limits, onlyAudio);
-  expectSegment(audioOnly[0].credits, 1800, 1840, SegmentSource::Audio);
-
-  DetectionMethods none;
-  none.standard = false;
-  none.chapter = false;
-  none.audio = false;
-  none.blackFrame = false;
-  auto ignored = resolve({standardEp, good, bad}, mark, limits, none);
-  CHECK_FALSE(ignored[0].intro);
-  CHECK_FALSE(ignored[2].intro);
-
   EpisodeEvidence host = episode("s.mkv", 300);
   EpisodeEvidence guest = episode("g.mkv", 300);
   guest.introWindow = print(0, 10, sequence(1, 20));
@@ -374,19 +351,38 @@ TEST_CASE("keep ranges snap to keyframes") {
   std::optional<TimeRange> credits = TimeRange{28, 40};
   auto snapped = planKeepRanges(40, intro, credits, {0, 10, 20, 30});
   REQUIRE(snapped.size() == 1);
-  CHECK(snapped[0].startSec == doctest::Approx(10));
-  CHECK(snapped[0].endSec == doctest::Approx(30));
+  CHECK(snapped[0].part == 2);
+  CHECK(snapped[0].range.startSec == doctest::Approx(10));
+  CHECK(snapped[0].range.endSec == doctest::Approx(30));
 
-  auto joined = planKeepRanges(30, TimeRange{8, 12}, std::nullopt, {0, 10, 20, 30});
-  REQUIRE(joined.size() == 1);
-  CHECK(joined[0].startSec == doctest::Approx(0));
-  CHECK(joined[0].endSec == doctest::Approx(30));
+  auto shortHead = planKeepRanges(30, TimeRange{8, 12}, std::nullopt, {0, 10, 20, 30});
+  REQUIRE(shortHead.size() == 1);
+  CHECK(shortHead[0].part == 2);
+  CHECK(shortHead[0].range.startSec == doctest::Approx(10));
+  CHECK(shortHead[0].range.endSec == doctest::Approx(30));
+
+  auto separate = planKeepRanges(100, TimeRange{12, 14}, TimeRange{90, 95}, {0, 15, 80, 100});
+  REQUIRE(separate.size() == 2);
+  CHECK(separate[0].part == 1);
+  CHECK(separate[0].range.startSec == doctest::Approx(0));
+  CHECK(separate[0].range.endSec == doctest::Approx(15));
+  CHECK(separate[1].part == 2);
+  CHECK(separate[1].range.startSec == doctest::Approx(0));
+  CHECK(separate[1].range.endSec == doctest::Approx(100));
+
+  auto tailKept = planKeepRanges(100, TimeRange{0, 20}, TimeRange{80, 90}, {0, 20, 80, 90, 100});
+  REQUIRE(tailKept.size() == 2);
+  CHECK(tailKept[0].part == 2);
+  CHECK(tailKept[1].part == 3);
+  CHECK(tailKept[1].range.startSec == doctest::Approx(90));
+  CHECK(tailKept[1].range.endSec == doctest::Approx(100));
 
   auto dropped = planKeepRanges(10, TimeRange{20, 22}, TimeRange{25, 30}, {});
   REQUIRE(dropped.size() == 1);
-  CHECK(dropped[0].startSec == doctest::Approx(0));
-  CHECK(dropped[0].endSec == doctest::Approx(10));
-  for (const auto& range : dropped) CHECK(range.startSec < range.endSec);
+  CHECK(dropped[0].part == 1);
+  CHECK(dropped[0].range.startSec == doctest::Approx(0));
+  CHECK(dropped[0].range.endSec == doctest::Approx(10));
+  for (const auto& part : dropped) CHECK(part.range.startSec < part.range.endSec);
 
   auto empty = planKeepRanges(100, TimeRange{0, 40}, TimeRange{40, 100}, {0, 50, 100});
   CHECK(empty.empty());

@@ -10,10 +10,11 @@ inline std::string fileNameOf(const std::string& path) {
   return path.substr(pos + 1);
 }
 
-inline std::string outputFileName(const std::string& fileName) {
+inline std::string outputFileName(const std::string& fileName, int part) {
+  const std::string mark = "_" + std::to_string(part);
   const auto dot = fileName.rfind('.');
-  if (dot == std::string::npos || dot == 0) return fileName + "_trimmed";
-  return fileName.substr(0, dot) + "_trimmed" + fileName.substr(dot);
+  if (dot == std::string::npos || dot == 0) return fileName + mark;
+  return fileName.substr(0, dot) + mark + fileName.substr(dot);
 }
 
 }  // namespace skipper
