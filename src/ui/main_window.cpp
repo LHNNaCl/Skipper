@@ -164,7 +164,6 @@ void MainWindow::setupTray() {
   if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
 
   tray_ = new QSystemTrayIcon(icon, qApp);
-  tray_->setToolTip(QStringLiteral("Skipper"));
 
   auto* menu = new QMenu(this);
   auto* showAction = menu->addAction(u8(text::kShowMainWindow));
@@ -176,6 +175,8 @@ void MainWindow::setupTray() {
   });
   tray_->setContextMenu(menu);
   tray_->show();
+  // Windows 11 drops a tip registered before the tray icon's version is set.
+  tray_->setToolTip(u8(text::kTrayTip));
 }
 
 void MainWindow::showFromTray() {
@@ -324,6 +325,20 @@ QWidget* MainWindow::buildSelectPage() {
   }
   times->setColumnStretch(4, 1);
   stdLayout->addLayout(times);
+  auto* methods = new QHBoxLayout;
+  methods->setSpacing(16);
+  methods->addWidget(caption(text::kMethods));
+  methodStandard_ = new QCheckBox(u8(text::kMethodStandard));
+  methodChapter_ = new QCheckBox(u8(text::kMethodChapter));
+  methodAudio_ = new QCheckBox(u8(text::kMethodAudio));
+  methodBlack_ = new QCheckBox(u8(text::kMethodBlack));
+  for (QCheckBox* box : {methodStandard_, methodChapter_, methodAudio_, methodBlack_}) {
+    box->setChecked(true);
+    methods->addWidget(box);
+  }
+  connect(methodStandard_, &QCheckBox::toggled, this, [this](bool) { refreshStandard(); });
+  methods->addStretch();
+  stdLayout->addLayout(methods);
   auto* footer = new QHBoxLayout;
   auto* hint = new QLabel(u8(text::kAnalyzeHint));
   hint->setObjectName("note");
@@ -555,7 +570,10 @@ void MainWindow::clearStandard() {
 void MainWindow::refreshStandard() {
   const int row = standardGroup_->checkedId();
   const bool chosen = row >= 0 && row < static_cast<int>(files_.size());
-  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) edit->setEnabled(chosen);
+  const bool useStandard = methodStandard_ && methodStandard_->isChecked();
+  for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) {
+    edit->setEnabled(chosen && useStandard);
+  }
   if (!chosen) setChip(standardChip_, u8(text::kNoStandard), "muted");
   else setChip(standardChip_, u8(text::kStandardPrefix) + fromStd(fileNameOf(files_[static_cast<std::size_t>(row)])), "std");
 }
@@ -566,7 +584,7 @@ void MainWindow::startAnalyze() {
   for (QLineEdit* edit : {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_}) setFieldError(edit, false, {});
   const int row = standardGroup_->checkedId();
   std::optional<StandardMark> mark;
-  if (row >= 0) {
+  if (methodStandard_->isChecked() && row >= 0) {
     QLineEdit* edits[] = {stdIntroStart_, stdIntroEnd_, stdCreditsStart_, stdCreditsEnd_};
     bool bad = false;
     for (QLineEdit* edit : edits) {
@@ -598,7 +616,12 @@ void MainWindow::startAnalyze() {
   liveListReady_ = false;
   resultPanel_->hide();
   resultNote_->hide();
-  controller_->analyze(directory_, mark);
+  DetectionMethods methods;
+  methods.standard = methodStandard_->isChecked();
+  methods.chapter = methodChapter_->isChecked();
+  methods.audio = methodAudio_->isChecked();
+  methods.blackFrame = methodBlack_->isChecked();
+  controller_->analyze(directory_, mark, methods);
 }
 
 void MainWindow::showProgress(const Progress& progress) {
@@ -1126,6 +1149,7 @@ void MainWindow::applyStyle() {
     QProgressBar { background: #1b1f24; border: 1px solid #2b3138; border-radius: 5px; }
     QProgressBar::chunk { background: #4f8cff; border-radius: 4px; }
     QProgressBar#done::chunk { background: #45c97a; }
+    QCheckBox { color: #e8eaec; spacing: 6px; background: transparent; }
     QRadioButton::indicator, QCheckBox::indicator { width: 16px; height: 16px; }
     QRadioButton::indicator:checked { background: #4f8cff; border: 4px solid #4f8cff; border-radius: 8px; }
     QRadioButton::indicator:unchecked { background: transparent; border: 1px solid #4a525c; border-radius: 8px; }

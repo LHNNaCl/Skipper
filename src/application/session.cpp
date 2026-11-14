@@ -53,6 +53,7 @@ void Session::report(const std::function<void(const Progress&)>& progress, const
 
 AnalyzeResult Session::analyze(const std::string& directory,
                                const std::optional<StandardMark>& standard,
+                               const DetectionMethods& methods,
                                const std::function<void(const Progress&)>& progress,
                                CancelToken& cancel) {
   const DetectionLimits limits;
@@ -63,7 +64,7 @@ AnalyzeResult Session::analyze(const std::string& directory,
     return result;
   }
 
-  std::optional<StandardMark> mark = standard;
+  std::optional<StandardMark> mark = methods.standard ? standard : std::nullopt;
   std::optional<ProbeInfo> standardProbe;
   std::optional<TimeRange> standardIntro;
   std::optional<TimeRange> standardCredits;
@@ -99,7 +100,8 @@ AnalyzeResult Session::analyze(const std::string& directory,
   }
 
   if (cancel.cancelled()) return cancelledResult();
-  const bool audio = probe_.chromaprintAvailable(cancel);
+  const bool wantAudio = methods.audio || (methods.standard && (standardIntro.has_value() || standardCredits.has_value()));
+  const bool audio = wantAudio && probe_.chromaprintAvailable(cancel);
   if (cancel.cancelled()) return cancelledResult();
 
   struct Item {
@@ -146,10 +148,10 @@ AnalyzeResult Session::analyze(const std::string& directory,
 
   std::optional<Fingerprint> introTemplate;
   std::optional<Fingerprint> creditsTemplate;
-  const bool introTemplateWanted = audio && standardIntro.has_value();
-  const bool creditsTemplateWanted = audio && standardCredits.has_value();
-  const bool introPairs = audio && !standardIntro && items.size() >= 2;
-  const bool creditsPairs = audio && !standardCredits && items.size() >= 2;
+  const bool introTemplateWanted = audio && methods.standard && standardIntro.has_value();
+  const bool creditsTemplateWanted = audio && methods.standard && standardCredits.has_value();
+  const bool introPairs = audio && methods.audio && !standardIntro && items.size() >= 2;
+  const bool creditsPairs = audio && methods.audio && !standardCredits && items.size() >= 2;
 
   if (audio && (introTemplateWanted || creditsTemplateWanted || introPairs || creditsPairs)) {
     if (introTemplateWanted && mark) {
@@ -190,10 +192,12 @@ AnalyzeResult Session::analyze(const std::string& directory,
   }
 
   std::vector<int> visualIndex;
-  for (int index = 0; index < static_cast<int>(items.size()); ++index) {
-    const bool isStandard = mark && items[static_cast<std::size_t>(index)].evidence.path == mark->path;
-    if (standardCredits && isStandard) continue;
-    visualIndex.push_back(index);
+  if (methods.blackFrame) {
+    for (int index = 0; index < static_cast<int>(items.size()); ++index) {
+      const bool isStandard = mark && items[static_cast<std::size_t>(index)].evidence.path == mark->path;
+      if (standardCredits && isStandard) continue;
+      visualIndex.push_back(index);
+    }
   }
   const int visualCount = static_cast<int>(visualIndex.size());
   for (int step = 0; step < visualCount; ++step) {
@@ -233,9 +237,9 @@ AnalyzeResult Session::analyze(const std::string& directory,
 
   AnalyzeResult result;
   result.reason = Reason::None;
-  result.plans = resolve(evidence, standardEvidence, limits);
+  result.plans = resolve(evidence, standardEvidence, limits, methods);
   result.failures = std::move(failures);
-  result.audioUnavailable = !audio;
+  result.audioUnavailable = wantAudio && !audio;
 
   directory_ = directory;
   durations_.clear();

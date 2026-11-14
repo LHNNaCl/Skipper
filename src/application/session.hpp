@@ -43,6 +43,7 @@ class Session {
 
   AnalyzeResult analyze(const std::string& directory,
                         const std::optional<StandardMark>& standard,
+                        const DetectionMethods& methods,
                         const std::function<void(const Progress&)>& progress,
                         CancelToken& cancel);
 

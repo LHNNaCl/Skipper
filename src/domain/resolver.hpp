@@ -10,6 +10,7 @@ namespace skipper {
 
 std::vector<EpisodePlan> resolve(const std::vector<EpisodeEvidence>& episodes,
                                  const std::optional<StandardEvidence>& standard,
-                                 const DetectionLimits& limits);
+                                 const DetectionLimits& limits,
+                                 const DetectionMethods& methods = {});
 
 }  // namespace skipper

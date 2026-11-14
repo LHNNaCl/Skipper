@@ -92,6 +92,13 @@ struct StandardMark {
   Endpoint credits;
 };
 
+struct DetectionMethods {
+  bool standard = true;
+  bool chapter = true;
+  bool audio = true;
+  bool blackFrame = true;
+};
+
 struct ConfirmedEpisode {
   std::string path;
   bool excluded = false;
